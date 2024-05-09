@@ -1,0 +1,7 @@
+streamlit==1.18.1
+langchain==0.0.154
+pyPDF2==3.0.1
+faiss-cpu==1.7.4
+streamlit-extras
+python-dotenv==1.0.0
+altair==4.0
