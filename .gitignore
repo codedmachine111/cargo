@@ -2,6 +2,6 @@
 
 /venv
 
-/data
+/tmp
 
 __pycache__
