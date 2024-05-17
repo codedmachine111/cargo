@@ -1,33 +1,44 @@
 import zipfile
 from PyPDF2 import PdfReader
-# from streamlit_extras.add_vertical_space import add_vertical_space
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-# import streamlit as st
+import camelot
 
 def processInput(file):
     if file is None:
         print("Could not upload files! Try again!")
-        return
+        return []
     else:
         chunks = []
-        if(file.type == "application/x-zip-compressed"):
-            # Extract PDF files from zip
+        if file.name.endswith(".zip"):
             with zipfile.ZipFile(file, "r") as z:
                 z.extractall("./data/")
-        elif(file.type == "application/pdf"):
-            # Read text from the pdf
-            pdf_info = PdfReader(file)
-            
-            # Append all pdf text data into a string
-            text = ""
-            for page in pdf_info.pages:
-                text += page.extract_text()
-            
-            # Split the text into chunks
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200, length_function=len)
-            chunks = text_splitter.split_text(text)  
+                for filename in z.namelist():
+                    if filename.endswith(".pdf"):
+                        with open(f"./data/{filename}", 'rb') as pdf_file:
+                            chunks.extend(extract_text_and_tables_from_pdf(pdf_file))
+        elif file.name.endswith(".pdf"):
+            chunks = extract_text_and_tables_from_pdf(file)
         else:
             print("Please upload a PDF or a zip file.")
-            return          
+            return []
+
     return chunks
 
+def extract_text_and_tables_from_pdf(file):
+    text_chunks = []
+    table_chunks = []
+
+    pdf_info = PdfReader(file)
+    text = ""
+    for page in pdf_info.pages:
+        text += page.extract_text()
+
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200, length_function=len)
+    text_chunks = text_splitter.split_text(text)
+    
+    tables = camelot.read_pdf(file.name, pages='all', flavor='stream')
+    for table in tables:
+        table_chunks.append(table.df.to_string())
+
+    combined_chunks = text_chunks + table_chunks
+    return combined_chunks
