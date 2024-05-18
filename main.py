@@ -1,4 +1,6 @@
 import os
+import uuid
+import asyncio
 import streamlit as st
 from streamlit_extras.add_vertical_space import add_vertical_space
 from process_input import processInput
@@ -6,36 +8,41 @@ from dotenv import load_dotenv
 
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.question_answering import load_qa_chain
-from langchain.prompts import PromptTemplate
-import uuid
 from pinecone import Pinecone, ServerlessSpec
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_google_vertexai import ChatVertexAI
 
 # Load environment variables
 load_dotenv()
 
+# Configure google GEN-AI
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./secret.json"
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
+# Connect to pinecone
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index_name = "pdf-index"
 
-# Ensure the index exists
+# Ensure the index exists in pinecone
 if index_name not in pc.list_indexes().names():
-  pc.create_index(
-      name=index_name,
-      dimension=768,
-      metric="cosine",
-      spec=ServerlessSpec(
-          cloud='aws', 
-          region='us-east-1'
-      ) 
-  )
+    pc.create_index(
+        name=index_name,
+        dimension=768,
+        metric="cosine",
+        spec=ServerlessSpec(
+            cloud='aws',
+            region='us-east-1'
+        )
+    )
 
-# Connect to the index
+# Connect to the pinecone index
 index = pc.Index(index_name, host=os.getenv("PINECONE_HOST"))
+pc_idx = None
 
 def get_vector_store(text_chunks):
+    '''
+        Converts chunks of data into vector embeddings and saves it to pinecone vector store.
+    '''
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     vectors = []
 
@@ -47,34 +54,76 @@ def get_vector_store(text_chunks):
         vectors.extend(batch_vectors)
 
     # Prepare data for upsert
-    pinecone_vectors = [(str(uuid.uuid4()), vector) for vector in vectors]
+    pinecone_vectors = [(str(uuid.uuid4()), vector, {'text': text_chunks[i]}) for i, vector in enumerate(vectors)]
 
     max_batch_size = 50  # Adjust this size based on Pinecone's request size limit
     for i in range(0, len(pinecone_vectors), max_batch_size):
         batch = pinecone_vectors[i:i+max_batch_size]
         index.upsert(vectors=batch)
-        
-    return pinecone_vectors
+
+async def get_conversational_chain():
+    # Define the prompt template
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a helpful assistant. Your task is to give detailed answers to users questions in a few sentences based on the context provided. If the query is not relevant to the context, you need to respond with: Sorry I could'nt find anything relevant,Try asking again"),
+        ("human", "context: {context}\n\nQuestion: {question}")
+    ])
+
+    chat = ChatVertexAI(model="chat-bison@002", convert_system_message_to_human=True)
+
+    chain = prompt | chat
+    return chain
+
+async def user_input(question):
+    # Convert question to embedding
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    query_vector = embeddings.embed_query(text=question)
+
+    if isinstance(query_vector, list):
+        query_vector = [float(val) for val in query_vector]
+    else:
+        query_vector = list(query_vector)
+
+    # Query Pinecone
+    docs = index.query(vector=query_vector, top_k=2, include_metadata=True).matches
+
+    if not docs:
+        return "Sorry, I couldn't find anything relevant in the knowledge base."
+
+    # Collect context from the documents
+    context = "\n".join(doc.metadata["text"] for doc in docs)
+
+    # Get the conversational chain
+    chain = await get_conversational_chain()
+    
+    # Prepare the inputs for the chain
+    inputs = {
+        "context": context,
+        "question": question
+    }
+
+    # Run the chain and get the response
+    response = chain.invoke(inputs)
+
+    output_text = response.content if hasattr(response, 'content') else "Sorry, I couldn't generate a response."
+    return output_text
 
 def main():
-    st.set_page_config(page_title="Abridge", page_icon=":brain:")
-    st.header("Chat with your all your pdf files with ease! :books:")
-    
-    input = st.text_input("Ask a question")
-    
+    st.set_page_config(page_title="Cargo", page_icon=":ship:")
+    st.header("Ask the Captain about anything! :male-pilot:")
+
     # SIDEBAR
     with st.sidebar:
-        st.title('Abridge')
+        st.title('Cargo :ship:')
         st.markdown('''
             ## About
-            Chat with your all your pdf files with ease!
+            Chat with all your PDF files with ease!
         ''')
         add_vertical_space(3)
         st.divider()
-        st.header("Your files")
-        
+        st.header("Your files:box:")
+
         uploaded_files = st.file_uploader(type=['pdf', 'zip'], label="Click below or drag and drop your files to upload!", accept_multiple_files=True)
-        
+
         if 'processed_files' not in st.session_state:
             st.session_state.processed_files = []
 
@@ -82,7 +131,7 @@ def main():
             # Process the input files accordingly
             if uploaded_files:
                 new_files = [file for file in uploaded_files if file.name not in st.session_state.processed_files]
-                
+
                 if new_files:
                     with st.status("Please wait as we process your input files...", expanded=True) as status:
                         st.write("Extracting data from Documents...")
@@ -91,10 +140,10 @@ def main():
                             text_chunks, table_chunks = processInput(new_file)
                             status.update(label="Successfully Chunked data!", state="running", expanded=True)
 
-                            # Convert to embeddings
+                            # Convert to embeddings and store in pinecone
                             st.write("Converting text to embeddings...")
-                            embeddings = get_vector_store(text_chunks[0])
-                            status.update(label="Successfully embedded chunks!", state="running", expanded=True)
+                            get_vector_store(text_chunks[0])
+                            status.update(label="Successfully stored embeddings", state="running", expanded=True)
 
                             st.session_state.processed_files.append(new_file.name)
                         status.update(label="Processing Complete!", state="complete", expanded=False)
@@ -102,6 +151,17 @@ def main():
                     st.write("All selected files have been processed already.")
             else:
                 st.write("No PDFs uploaded.")
+
+    # User input
+    input = st.text_input("Ask a question")
+    if input is not None or input!="":
+        if st.session_state.processed_files is not None:
+            response = asyncio.run(user_input(input))
+            st.write("Reply: ", response)
+        else: 
+            st.write("Oops! You have not uploaded any files yet!")
+    else:
+        st.write("Please add a valid prompt")
 
 if __name__ == '__main__':
     main()

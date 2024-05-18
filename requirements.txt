@@ -4,3 +4,6 @@ pyPDF2==3.0.1
 streamlit-extras
 python-dotenv==1.0.0
 langchain_google_genai
+langchain-google-vertexai
+google-generativeai
+google-cloud-aiplatform
