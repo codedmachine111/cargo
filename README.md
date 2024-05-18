@@ -17,6 +17,7 @@ Cargo is an RAG designed to allow users to chat with multiple large PDF document
    <img src="https://github.com/codedmachine111/abridge/assets/88738817/492cc671-e6c9-494b-ba2b-296f7c1bad2a" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/abridge/assets/88738817/f4e6f979-baa6-498c-9d49-b26da8e53cf8" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/cargo/assets/88738817/bc76a436-7900-4a65-ade3-fb22b70cf08b" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+   <img src="https://github.com/codedmachine111/cargo/assets/88738817/ef687319-cf5c-49d0-9a95-cbd209c0a95b" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/abridge/assets/88738817/2fb73136-6d50-423f-b4a0-1962b8e6914b" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 
 </p>
@@ -24,7 +25,11 @@ Cargo is an RAG designed to allow users to chat with multiple large PDF document
 - **Langchain**: simplifies the integration of language models into applications, facilitating complex natural language processing tasks.
 - **Pinecone**:  offers a vector database that allows efficient similarity search and retrieval for high-dimensional data.
 - **Vertex AI**: Machine learning platform by Google that gives access to Large Language Models.
+- **Google AI studio**: platform that gives access to a text embedding model and Gemini.
 - **Streamlit**: allows for the rapid development of interactive web applications with minimal coding effort.
+
+## Architecture
+<img src="https://github.com/codedmachine111/cargo/assets/88738817/3b1e1be4-cd8d-4763-b4e4-0cd5c2c2fecf" width="900px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 
 ## Installation steps
 
@@ -41,6 +46,7 @@ python -m venv venv
 ```bash
 pip install -r requirements.txt
 ```
+
 
 4. Create a .env file in the root directory of the project and add:
 
