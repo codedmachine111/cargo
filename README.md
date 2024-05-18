@@ -16,14 +16,14 @@ Cargo is an RAG designed to allow users to chat with multiple large PDF document
 <p align="left">
    <img src="https://github.com/codedmachine111/abridge/assets/88738817/492cc671-e6c9-494b-ba2b-296f7c1bad2a" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/abridge/assets/88738817/f4e6f979-baa6-498c-9d49-b26da8e53cf8" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-   <img src="https://github.com/codedmachine111/abridge/assets/88738817/1ccc427b-a6bb-45e6-a6b1-ac555b025e94" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+   <img src="https://github.com/codedmachine111/cargo/assets/88738817/930444ab-bfe4-4ca4-80ea-de5ca6b49179" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/abridge/assets/88738817/2fb73136-6d50-423f-b4a0-1962b8e6914b" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 
 </p>
 
 - **Langchain**: simplifies the integration of language models into applications, facilitating complex natural language processing tasks.
 - **Pinecone**:  offers a vector database that allows efficient similarity search and retrieval for high-dimensional data.
-- **Vertex AI**: provides robust AI capabilities, enabling the creation and deployment of machine learning models at scale.
+- **PaLM AI**: 540 billion parameter transformer-based large language model developed by Google AI.
 - **Streamlit**: allows for the rapid development of interactive web applications with minimal coding effort.
 
 ## Installation steps
@@ -47,7 +47,13 @@ GOOGLE_API_KEY = "YOUR-API-KEY"
 > You need to get your Google API key from ![here](https://aistudio.google.com/)
 > and your Pinecone API key from ![here](https://www.pinecone.io/)
 
-4. Start the app:
+4. Create and activate a virtual environment
+```bash
+python -m venv venv
+./venv/Scripts/activate
+```
+
+5. Start the app:
 
 ```bash
 streamlit run main.py
