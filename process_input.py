@@ -1,10 +1,10 @@
 import zipfile
-from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import streamlit as st
 import camelot
 import tempfile
 import re
+import fitz
 from io import BytesIO
 
 def prune_text(text):
@@ -57,19 +57,31 @@ def extract_text_and_tables(pdf_path):
     chunks_per_pdf = []
     all_table_chunks = []
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200, length_function=len)
-    pdf_info = PdfReader(pdf_path)
+    table_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500, length_function=len)
+
+    doc = fitz.open(pdf_path)
+
     pdf_chunks = []
-    for page in pdf_info.pages:
-        text = page.extract_text()
+    for page in doc:
+        text = page.get_text()
         if text:
+            # pruned_text = prune_text(text)
             pdf_chunks.extend(text_splitter.split_text(text))
     chunks_per_pdf.append(pdf_chunks)
 
     # Extract tables
-    # tables = camelot.read_pdf(pdf_path, pages='all', flavor='stream')
-    # for table in tables:
-    #     table_df = table.df
-    #     table_text = table_df.to_string(index=False, header=False)
-    #     all_table_chunks.extend(text_splitter.split_text(table_text))
+    tables = camelot.read_pdf(pdf_path, pages='all', flavor='stream')
+    for table in tables:
+        table.df.replace(to_replace='\(cid\:[0-9]+\)', value='', inplace=True, regex=True)
+        table.df.replace(to_replace='\\n', value=' ', inplace=True, regex=True)
+        table.df.replace(to_replace='\s+', value=' ', inplace=True, regex=True)
+        
+        # Remove rows and columns that are completely empty
+        table.df.replace("", float("NaN"), inplace=True)
+        table.df.dropna(how='all', inplace=True)
+        table.df.dropna(axis=1, how='all', inplace=True)
+        table_df = table.df
+        table_json = table_df.to_json(orient='split')
+        all_table_chunks.extend(table_splitter.split_text(table_json))
 
     return chunks_per_pdf, all_table_chunks

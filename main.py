@@ -13,8 +13,6 @@ import google.generativeai as genai
 from pinecone import Pinecone, ServerlessSpec
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_vertexai import ChatVertexAI
-from langchain.memory import ConversationBufferMemory
-from langchain.chains.conversation.base import ConversationChain
 
 # Load environment variables
 load_dotenv()
@@ -44,12 +42,13 @@ if index_name not in pc.list_indexes().names():
 # Connect to the pinecone index
 index = pc.Index(index_name, host=os.getenv("PINECONE_HOST"))
 
-def get_vector_store(text_chunks):
+def get_vector_store(text_chunks, table_chunks):
     '''
         Converts chunks of data into vector embeddings and saves it to pinecone vector store.
     '''
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     vectors = []
+    table_vectors = []
 
     # Batch the text chunks to process in groups of 100
     batch_size = 100
@@ -58,18 +57,45 @@ def get_vector_store(text_chunks):
         batch_vectors = embeddings.embed_documents(batch)
         vectors.extend(batch_vectors)
 
+    for i in range(0, len(table_chunks), batch_size):
+        batch = table_chunks[i:i+batch_size]
+        batch_vectors = embeddings.embed_documents(batch)
+        table_vectors.extend(batch_vectors)
+
     # Prepare data for upsert
     pinecone_vectors = [(str(uuid.uuid4()), vector, {'text': text_chunks[i]}) for i, vector in enumerate(vectors)]
+    pinecone_table_vectors = [(str(uuid.uuid4()), vector, {'table-info': table_chunks[i]}) for i, vector in enumerate(table_vectors)]
+
+    # Debug: Print vectors and metadata before upserting
+    for vec in pinecone_vectors:
+        print(f"Vector ID: {vec[0]}")
+        print(f"Vector: {vec[1]}")
+        print(f"Metadata: {vec[2]}")
+
+    for vec in pinecone_table_vectors:
+        print(f"Vector ID: {vec[0]}")
+        print(f"Vector: {vec[1]}")
+        print(f"Metadata: {vec[2]}")
 
     max_batch_size = 100
     for i in range(0, len(pinecone_vectors), max_batch_size):
         batch = pinecone_vectors[i:i+max_batch_size]
-        index.upsert(vectors=batch)
+        try:
+            index.upsert(vectors=batch)
+        except Exception as e:
+            print(f"Error upserting text vectors: {e}")
+    
+    for i in range(0, len(pinecone_table_vectors), max_batch_size):
+        batch = pinecone_table_vectors[i:i+max_batch_size]
+        try:
+            index.upsert(vectors=batch)
+        except Exception as e:
+            print(f"Error upserting table vectors: {e}")
 
 async def get_conversational_chain():
     # Define the prompt template
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful assistant. Your task is to give detailed answers to users questions in a few sentences based on the context provided. If the query is not relevant to the context, you need to respond with: Sorry I could'nt find anything relevant,Try asking again"),
+        ("system", "You are a friendly chatbot at an automobile company. Your task is to give detailed answers to users questions in a few sentences based on the context provided. If the query is not relevant to the context, you need to respond with: Sorry I couldn't find anything relevant, try asking again."),
         ("human", "context: {context}\n\nQuestion: {question}")
     ])
 
@@ -97,7 +123,7 @@ async def user_input(question):
         return "Sorry, I couldn't find anything relevant in the knowledge base."
 
     # Collect context from the documents
-    context = "\n".join(doc.metadata["text"] for doc in docs)
+    context = "\n".join(doc.metadata["text"] if "text" in doc.metadata else doc.metadata["table-info"] for doc in docs)
 
     # Get the conversational chain
     chain = await get_conversational_chain()
@@ -128,6 +154,8 @@ def main():
     st.header("Ask the Captain about your files! :male-pilot:")
     st.write(css, unsafe_allow_html=True)
     
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
     # SIDEBAR
     with st.sidebar:
         st.title('Cargo :ship::anchor:')
@@ -159,7 +187,7 @@ def main():
 
                             # Convert to embeddings and store in pinecone
                             st.write("Converting text to embeddings...")
-                            get_vector_store(text_chunks[0])
+                            get_vector_store(text_chunks[0], table_chunks)
                             status.update(label="Successfully stored embeddings", state="running", expanded=True)
 
                             st.session_state.processed_files.append(new_file.name)
