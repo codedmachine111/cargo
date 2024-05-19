@@ -1,5 +1,9 @@
 > **Note**
 > This project is a part of BGSW (Bosch) GenAI Hackathon.
+<p align="center">
+  <img src="https://github.com/codedmachine111/cargo/assets/88738817/0781bd08-bb16-4c40-ba3d-dc0f0e6110d8" alt="cargo-banner" width="100">
+  <img src="https://github.com/codedmachine111/cargo/assets/88738817/004ad416-7e90-4de4-889e-b06a175b00fc" alt="cargo-banner" width="300">
+</p>
 
 # Cargo
 
