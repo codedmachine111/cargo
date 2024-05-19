@@ -122,32 +122,22 @@ async def user_input(question):
     
     return output_text
 
-def display_chat_history():
-    if "chat_history" in st.session_state and st.session_state.chat_history:
-        with st.container(height=600, border=True):
-            for message in st.session_state.chat_history:
-                if message["role"] == "user":
-                    st.write(user_template.replace("{{MSG}}", message["content"]), unsafe_allow_html=True)
-                else:
-                    st.write(bot_template.replace("{{MSG}}", message["content"]), unsafe_allow_html=True)
-
 def main():
     st.set_page_config(page_title="Cargo", page_icon=":ship:")
     st.image('./assets/captain.png', width=200)
-    st.header("Ask the Captain about anything! :male-pilot:")
+    st.header("Ask the Captain about your files! :male-pilot:")
     st.write(css, unsafe_allow_html=True)
     
     # SIDEBAR
     with st.sidebar:
-        st.title('Cargo')
+        st.title('Cargo :ship::anchor:')
 
         st.markdown('''
-            ## About
             Cargo is an RAG designed to allow users to chat with multiple large PDF documents with ease. 
         ''')
         add_vertical_space(3)
         st.divider()
-        st.header("Upload your files and start talking with the captain!")
+        st.header("Upload your files and start talking with the captain! :open_file_folder:")
 
         uploaded_files = st.file_uploader(type=['pdf', 'zip'], label="Click below or drag and drop your files to upload!", accept_multiple_files=True)
 
@@ -179,21 +169,26 @@ def main():
             else:
                 st.write("No PDFs uploaded.")
 
-    # Display chat history
-    display_chat_history()
-
-    # User input
-    input = st.text_input("Ask a question")
-    if input is not None and len(input) > 0:
-        if len(st.session_state.processed_files) > 0:
-            response = asyncio.run(user_input(input))
-            # Display updated chat history
-            display_chat_history()
+    # Load initial chat
+    for message in st.session_state.chat_history:
+        if(message["role"] == "user"):
+            with st.chat_message(message["role"], avatar="❓"):
+                st.write(user_template.replace("{{MSG}}", message["content"]), unsafe_allow_html=True)
         else:
-            st.write("Upload files to chat with the Captian!")
-    else:
-        st.write("Please enter a valid prompt")
+            with st.chat_message(message["role"], avatar="⚓"):
+                st.write(bot_template.replace("{{MSG}}", message["content"]), unsafe_allow_html=True)
+    
+    # User input
+    if prompt := st.chat_input("Ask about your files..."):
+        # Display user message in chat message container
+        with st.chat_message("user", avatar="❓"):
+            st.write(user_template.replace("{{MSG}}", prompt), unsafe_allow_html=True)
 
+        with st.spinner("Thinking..."):
+            response = asyncio.run(user_input(prompt))
+            # Display assistant response in chat message container
+            with st.chat_message("assistant", avatar="⚓"):
+                st.write(bot_template.replace("{{MSG}}", response), unsafe_allow_html=True)
 
 if __name__ == '__main__':
     main()
