@@ -33,7 +33,7 @@ Cargo is an RAG designed to allow users to chat with multiple large PDF document
 - **Streamlit**: allows for the rapid development of interactive web applications with minimal coding effort.
 
 ## Architecture
-<img src="https://github.com/codedmachine111/cargo/assets/88738817/3b1e1be4-cd8d-4763-b4e4-0cd5c2c2fecf" width="900px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="https://github.com/codedmachine111/cargo/assets/88738817/1410288e-42b1-4786-9b61-25291a29c9ed" width="900px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 
 ## Installation steps
 
@@ -55,9 +55,10 @@ pip install -r requirements.txt
 4. Create a .env file in the root directory of the project and add:
 
 ```bash
-PINECONE_API_KEY = "YOUR-API-KEY"
-PINECONE_HOST = "YOUR-API-KEY"
-GOOGLE_API_KEY = "YOUR-API-KEY"
+PINECONE_API_KEY= "YOUR-API-KEY"
+PINECONE_HOST= "YOUR-API-KEY"
+GOOGLE_API_KEY= "YOUR-API-KEY"
+PROJECT_ID="YOUR-GOOGLE-CLOUD-PROJECT-ID"
 ```
 > **Note**
 > You need to get your Google API key from [here](https://aistudio.google.com/)
