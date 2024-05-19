@@ -60,11 +60,11 @@ PINECONE_HOST = "YOUR-API-KEY"
 GOOGLE_API_KEY = "YOUR-API-KEY"
 ```
 > **Note**
-> You need to get your Google API key from ![here](https://aistudio.google.com/)
-> and your Pinecone API key from ![here](https://www.pinecone.io/)
+> You need to get your Google API key from [here](https://aistudio.google.com/)
+> and your Pinecone API key from [here](https://www.pinecone.io/)
 
 5. Google Cloud Platform setup:
-   - Login to ![Google Cloud Platform](https://cloud.google.com) and create a new project.
+   - Login to [Google Cloud Platform](https://cloud.google.com) and create a new project.
    - Navigate to IAM & Admin > Service Accounts.
    - Click Create Service Account.
    - Grant the necessary permissions to this service account (e.g., Vertex AI User).
