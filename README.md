@@ -15,7 +15,7 @@ Cargo is an RAG designed to allow users to chat with multiple large PDF document
 ## Tools used
 <p align="left">
    <img src="https://github.com/codedmachine111/abridge/assets/88738817/492cc671-e6c9-494b-ba2b-296f7c1bad2a" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-   <img src="https://github.com/codedmachine111/abridge/assets/88738817/f4e6f979-baa6-498c-9d49-b26da8e53cf8" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+   <img src="https://github.com/codedmachine111/cargo/assets/88738817/350c8f12-ff51-4a76-8ab5-c05daba96c1d" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/cargo/assets/88738817/bc76a436-7900-4a65-ade3-fb22b70cf08b" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/cargo/assets/88738817/ef687319-cf5c-49d0-9a95-cbd209c0a95b" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/abridge/assets/88738817/2fb73136-6d50-423f-b4a0-1962b8e6914b" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
