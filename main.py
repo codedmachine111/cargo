@@ -3,23 +3,29 @@ import uuid
 import asyncio
 import streamlit as st
 from streamlit_extras.add_vertical_space import add_vertical_space
-from process_input import processInput
 from dotenv import load_dotenv
+
+from process_input import processInput
+from templates import css, user_template, bot_template
 
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
 from pinecone import Pinecone, ServerlessSpec
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_vertexai import ChatVertexAI
+from langchain.memory import ConversationBufferMemory
+from langchain.chains.conversation.base import ConversationChain
 
 # Load environment variables
 load_dotenv()
 
-# Configure google GEN-AI
+# Configure Vertex AI
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./secret.json"
+
+# Configure Google AI studio
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Connect to pinecone
+# Configure Pinecone
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index_name = "pdf-index"
 
@@ -37,7 +43,6 @@ if index_name not in pc.list_indexes().names():
 
 # Connect to the pinecone index
 index = pc.Index(index_name, host=os.getenv("PINECONE_HOST"))
-pc_idx = None
 
 def get_vector_store(text_chunks):
     '''
@@ -56,7 +61,7 @@ def get_vector_store(text_chunks):
     # Prepare data for upsert
     pinecone_vectors = [(str(uuid.uuid4()), vector, {'text': text_chunks[i]}) for i, vector in enumerate(vectors)]
 
-    max_batch_size = 50  # Adjust this size based on Pinecone's request size limit
+    max_batch_size = 100
     for i in range(0, len(pinecone_vectors), max_batch_size):
         batch = pinecone_vectors[i:i+max_batch_size]
         index.upsert(vectors=batch)
@@ -68,12 +73,14 @@ async def get_conversational_chain():
         ("human", "context: {context}\n\nQuestion: {question}")
     ])
 
-    chat = ChatVertexAI(model="chat-bison@002", convert_system_message_to_human=True)
-
-    chain = prompt | chat
+    llm = ChatVertexAI(model="chat-bison@002", convert_system_message_to_human=True)
+    chain = prompt | llm
     return chain
 
 async def user_input(question):
+    if len(question) == 0:
+        return "Please enter a valid prompt"
+    
     # Convert question to embedding
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     query_vector = embeddings.embed_query(text=question)
@@ -105,22 +112,42 @@ async def user_input(question):
     response = chain.invoke(inputs)
 
     output_text = response.content if hasattr(response, 'content') else "Sorry, I couldn't generate a response."
+    
+    # Update chat history
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    st.session_state.chat_history.append({"role": "user", "content": question})
+    st.session_state.chat_history.append({"role": "assistant", "content": output_text})
+    
     return output_text
+
+def display_chat_history():
+    if "chat_history" in st.session_state and st.session_state.chat_history:
+        with st.container(height=600, border=True):
+            for message in st.session_state.chat_history:
+                if message["role"] == "user":
+                    st.write(user_template.replace("{{MSG}}", message["content"]), unsafe_allow_html=True)
+                else:
+                    st.write(bot_template.replace("{{MSG}}", message["content"]), unsafe_allow_html=True)
 
 def main():
     st.set_page_config(page_title="Cargo", page_icon=":ship:")
+    st.image('./assets/captain.png', width=200)
     st.header("Ask the Captain about anything! :male-pilot:")
-
+    st.write(css, unsafe_allow_html=True)
+    
     # SIDEBAR
     with st.sidebar:
-        st.title('Cargo :ship:')
+        st.title('Cargo')
+
         st.markdown('''
             ## About
-            Chat with all your PDF files with ease!
+            Cargo is an RAG designed to allow users to chat with multiple large PDF documents with ease. 
         ''')
         add_vertical_space(3)
         st.divider()
-        st.header("Your files:box:")
+        st.header("Upload your files and start talking with the captain!")
 
         uploaded_files = st.file_uploader(type=['pdf', 'zip'], label="Click below or drag and drop your files to upload!", accept_multiple_files=True)
 
@@ -152,16 +179,21 @@ def main():
             else:
                 st.write("No PDFs uploaded.")
 
+    # Display chat history
+    display_chat_history()
+
     # User input
     input = st.text_input("Ask a question")
-    if input is not None or input!="":
-        if st.session_state.processed_files is not None:
+    if input is not None and len(input) > 0:
+        if len(st.session_state.processed_files) > 0:
             response = asyncio.run(user_input(input))
-            st.write("Reply: ", response)
-        else: 
-            st.write("Oops! You have not uploaded any files yet!")
+            # Display updated chat history
+            display_chat_history()
+        else:
+            st.write("Upload files to chat with the Captian!")
     else:
-        st.write("Please add a valid prompt")
+        st.write("Please enter a valid prompt")
+
 
 if __name__ == '__main__':
     main()
