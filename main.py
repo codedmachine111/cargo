@@ -187,7 +187,7 @@ def main():
 
                             # Convert to embeddings and store in pinecone
                             st.write("Converting text to embeddings...")
-                            # get_vector_store(text_chunks[0], table_chunks)
+                            get_vector_store(text_chunks[0], table_chunks)
                             status.update(label="Successfully stored embeddings", state="running", expanded=True)
 
                             st.session_state.processed_files.append(new_file.name)
