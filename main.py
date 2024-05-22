@@ -156,6 +156,9 @@ def main():
     
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
+    if 'processed_files' not in st.session_state:
+        st.session_state.processed_files = []
+
     # SIDEBAR
     with st.sidebar:
         st.title('Cargo :ship::anchor:')
@@ -168,9 +171,6 @@ def main():
         st.header("Upload your files and start talking with the captain! :open_file_folder:")
 
         uploaded_files = st.file_uploader(type=['pdf', 'zip'], label="Click below or drag and drop your files to upload!", accept_multiple_files=True)
-
-        if 'processed_files' not in st.session_state:
-            st.session_state.processed_files = []
 
         if st.button("Process"):
             # Process the input files accordingly
@@ -187,7 +187,7 @@ def main():
 
                             # Convert to embeddings and store in pinecone
                             st.write("Converting text to embeddings...")
-                            get_vector_store(text_chunks[0], table_chunks)
+                            # get_vector_store(text_chunks[0], table_chunks)
                             status.update(label="Successfully stored embeddings", state="running", expanded=True)
 
                             st.session_state.processed_files.append(new_file.name)
@@ -208,15 +208,18 @@ def main():
     
     # User input
     if prompt := st.chat_input("Ask about your files..."):
-        # Display user message in chat message container
-        with st.chat_message("user", avatar="❓"):
-            st.write(user_template.replace("{{MSG}}", prompt), unsafe_allow_html=True)
+        if len(st.session_state.processed_files)>0 :
+            # Display user message in chat message container
+            with st.chat_message("user", avatar="❓"):
+                st.write(user_template.replace("{{MSG}}", prompt), unsafe_allow_html=True)
 
-        with st.spinner("Thinking..."):
-            response = asyncio.run(user_input(prompt))
-            # Display assistant response in chat message container
-            with st.chat_message("assistant", avatar="⚓"):
-                st.write(bot_template.replace("{{MSG}}", response), unsafe_allow_html=True)
+            with st.spinner("Thinking..."):
+                response = asyncio.run(user_input(prompt))
+                # Display assistant response in chat message container
+                with st.chat_message("assistant", avatar="⚓"):
+                    st.write(bot_template.replace("{{MSG}}", response), unsafe_allow_html=True)
+        else:
+            st.write("Please upload some documents to chat with them!")
 
 if __name__ == '__main__':
     main()
