@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from process_input import processInput
 from templates import css, user_template, bot_template
+from helpers import *
 
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
@@ -42,6 +43,10 @@ if index_name not in pc.list_indexes().names():
 # Connect to the pinecone index
 index = pc.Index(index_name, host=os.getenv("PINECONE_HOST"))
 
+# Define summarization model
+MODEL_NAME = "models/gemini-1.5-pro-latest"
+model = genai.GenerativeModel(model_name=MODEL_NAME)
+
 def get_vector_store(text_chunks, table_chunks):
     '''
         Converts chunks of data into vector embeddings and saves it to pinecone vector store.
@@ -65,17 +70,6 @@ def get_vector_store(text_chunks, table_chunks):
     # Prepare data for upsert
     pinecone_vectors = [(str(uuid.uuid4()), vector, {'text': text_chunks[i]}) for i, vector in enumerate(vectors)]
     pinecone_table_vectors = [(str(uuid.uuid4()), vector, {'table-info': table_chunks[i]}) for i, vector in enumerate(table_vectors)]
-
-    # Debug: Print vectors and metadata before upserting
-    for vec in pinecone_vectors:
-        print(f"Vector ID: {vec[0]}")
-        print(f"Vector: {vec[1]}")
-        print(f"Metadata: {vec[2]}")
-
-    for vec in pinecone_table_vectors:
-        print(f"Vector ID: {vec[0]}")
-        print(f"Vector: {vec[1]}")
-        print(f"Metadata: {vec[2]}")
 
     max_batch_size = 100
     for i in range(0, len(pinecone_vectors), max_batch_size):
@@ -182,12 +176,18 @@ def main():
                         st.write("Extracting data from Documents...")
                         for new_file in new_files:
                             # Extract data
-                            text_chunks, table_chunks = processInput(new_file)
-                            status.update(label="Successfully Chunked data!", state="running", expanded=True)
+                            texts, tables = processInput(new_file)
+                            status.update(label="Successfully extracted data!", state="running", expanded=True)
+
+                            # Generate summaries of data
+                            st.write("Summarizing data...")
+                            text_summ, table_summ = generate_summaries(model, texts, tables)
+                            image_summ, image_64 = generate_image_summaries(model, "./figures")
+                            status.update(label="Successfully summarized data", state="running", expanded=True)
 
                             # Convert to embeddings and store in pinecone
                             st.write("Converting text to embeddings...")
-                            get_vector_store(text_chunks[0], table_chunks)
+                            # get_vector_store(text_chunks[0], table_chunks)
                             status.update(label="Successfully stored embeddings", state="running", expanded=True)
 
                             st.session_state.processed_files.append(new_file.name)

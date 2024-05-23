@@ -6,5 +6,6 @@ langchain_google_genai
 langchain-google-vertexai
 google-generativeai
 google-cloud-aiplatform
-fitz
-camelot-py[base]
+"unstructured[all-docs]"
+pytesseract
+pillow
