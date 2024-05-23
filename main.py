@@ -14,6 +14,7 @@ import google.generativeai as genai
 from pinecone import Pinecone, ServerlessSpec
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_vertexai import ChatVertexAI
+from langchain_pinecone import PineconeVectorStore
 
 # Load environment variables
 load_dotenv()
@@ -26,12 +27,12 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Configure Pinecone
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index_name = "pdf-index"
+INDEX_NAME = "pdf-index"
 
 # Ensure the index exists in pinecone
-if index_name not in pc.list_indexes().names():
+if INDEX_NAME not in pc.list_indexes().names():
     pc.create_index(
-        name=index_name,
+        name=INDEX_NAME,
         dimension=768,
         metric="cosine",
         spec=ServerlessSpec(
@@ -41,50 +42,42 @@ if index_name not in pc.list_indexes().names():
     )
 
 # Connect to the pinecone index
-index = pc.Index(index_name, host=os.getenv("PINECONE_HOST"))
+index = pc.Index(INDEX_NAME, host=os.getenv("PINECONE_HOST"))
 
 # Define summarization model
 MODEL_NAME = "models/gemini-1.5-pro-latest"
 model = genai.GenerativeModel(model_name=MODEL_NAME)
+embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
-def get_vector_store(text_chunks, table_chunks):
+def get_vector_store(texts, text_sum, tables, tables_sum, images64, images_sum):
     '''
-        Converts chunks of data into vector embeddings and saves it to pinecone vector store.
+        Converts data into vector embeddings and saves it to vector store.
     '''
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     vectors = []
-    table_vectors = []
 
-    # Batch the text chunks to process in groups of 100
-    batch_size = 100
-    for i in range(0, len(text_chunks), batch_size):
-        batch = text_chunks[i:i+batch_size]
-        batch_vectors = embeddings.embed_documents(batch)
-        vectors.extend(batch_vectors)
+    # Embed and store text summaries
+    for text, summary in zip(texts, text_sum):
+        summary_vector = embeddings.embed_documents([summary])[0]
+        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'text_summary', 'content': summary, 'raw_text': text}))
 
-    for i in range(0, len(table_chunks), batch_size):
-        batch = table_chunks[i:i+batch_size]
-        batch_vectors = embeddings.embed_documents(batch)
-        table_vectors.extend(batch_vectors)
+    # Embed and store table summaries
+    for table, summary in zip(tables, tables_sum):
+        summary_vector = embeddings.embed_documents([summary])[0]
+        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'table_summary', 'content': summary, 'raw_table': table}))
 
-    # Prepare data for upsert
-    pinecone_vectors = [(str(uuid.uuid4()), vector, {'text': text_chunks[i]}) for i, vector in enumerate(vectors)]
-    pinecone_table_vectors = [(str(uuid.uuid4()), vector, {'table-info': table_chunks[i]}) for i, vector in enumerate(table_vectors)]
+    # Embed and store image summaries
+    for image, summary in zip(images64, images_sum):
+        summary_vector = embeddings.embed_documents([summary])[0]
+        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'image_summary', 'content': summary, 'raw_image': image}))
 
+    # Upsert to pinecone
     max_batch_size = 100
-    for i in range(0, len(pinecone_vectors), max_batch_size):
-        batch = pinecone_vectors[i:i+max_batch_size]
+    for i in range(0, len(vectors), max_batch_size):
+        batch = vectors[i:i + max_batch_size]
         try:
             index.upsert(vectors=batch)
         except Exception as e:
-            print(f"Error upserting text vectors: {e}")
-    
-    for i in range(0, len(pinecone_table_vectors), max_batch_size):
-        batch = pinecone_table_vectors[i:i+max_batch_size]
-        try:
-            index.upsert(vectors=batch)
-        except Exception as e:
-            print(f"Error upserting table vectors: {e}")
+            print(f"Error upserting vectors: {e}")
 
 async def get_conversational_chain():
     # Define the prompt template
@@ -187,7 +180,7 @@ def main():
 
                             # Convert to embeddings and store in pinecone
                             st.write("Converting text to embeddings...")
-                            # get_vector_store(text_chunks[0], table_chunks)
+                            get_vector_store(texts, text_summ, tables, table_summ, image_64, image_summ)
                             status.update(label="Successfully stored embeddings", state="running", expanded=True)
 
                             st.session_state.processed_files.append(new_file.name)

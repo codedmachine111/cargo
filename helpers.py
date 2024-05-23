@@ -1,4 +1,5 @@
 import os
+import shutil
 import base64
 import PIL
 import PIL.Image
@@ -59,5 +60,6 @@ def generate_image_summaries(model, image_dir):
                 response = model.generate_content([prompt, img])
                 image_summaries.append(response.text)
 
+    shutil.rmtree(image_dir)
     return image_summaries, img_b64_list
 
