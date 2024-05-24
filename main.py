@@ -1,5 +1,6 @@
 import os
 import uuid
+import time
 import asyncio
 import streamlit as st
 from streamlit_extras.add_vertical_space import add_vertical_space
@@ -15,6 +16,9 @@ from pinecone import Pinecone, ServerlessSpec
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_vertexai import ChatVertexAI
 from langchain_pinecone import PineconeVectorStore
+from langchain.storage import InMemoryStore
+from langchain.schema.document import Document
+from langchain.retrievers.multi_vector import MultiVectorRetriever
 
 # Load environment variables
 load_dotenv()
@@ -42,14 +46,42 @@ if INDEX_NAME not in pc.list_indexes().names():
     )
 
 # Connect to the pinecone index
-index = pc.Index(INDEX_NAME, host=os.getenv("PINECONE_HOST"))
+index = pc.Index(INDEX_NAME)
 
 # Define summarization model
 MODEL_NAME = "models/gemini-1.5-pro-latest"
-model = genai.GenerativeModel(model_name=MODEL_NAME)
+safety_settings = [
+    {
+        "category": "HARM_CATEGORY_DANGEROUS",
+        "threshold": "BLOCK_NONE",
+    },
+    {
+        "category": "HARM_CATEGORY_HARASSMENT",
+        "threshold": "BLOCK_NONE",
+    },
+    {
+        "category": "HARM_CATEGORY_HATE_SPEECH",
+        "threshold": "BLOCK_NONE",
+    },
+    {
+        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        "threshold": "BLOCK_NONE",
+    },
+    {
+        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+        "threshold": "BLOCK_NONE",
+    },
+]
+model = genai.GenerativeModel(model_name=MODEL_NAME, safety_settings=safety_settings)
 embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
-def get_vector_store(texts, text_sum, tables, tables_sum, images64, images_sum):
+vectorstore = PineconeVectorStore(index=INDEX_NAME, embedding=embeddings)
+store = InMemoryStore()
+id_key = "doc_id"
+
+retriever = MultiVectorRetriever(vectorstore=vectorstore, docstore=store, id_key=id_key)
+
+def get_vector_store(texts, text_sum, tables, tables_sum, image_paths, images_sum):
     '''
         Converts data into vector embeddings and saves it to vector store.
     '''
@@ -65,10 +97,10 @@ def get_vector_store(texts, text_sum, tables, tables_sum, images64, images_sum):
         summary_vector = embeddings.embed_documents([summary])[0]
         vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'table_summary', 'content': summary, 'raw_table': table}))
 
-    # Embed and store image summaries
-    for image, summary in zip(images64, images_sum):
+    # Embed and store image summariesstore image embeddings using pinecone
+    for image_path, summary in zip(image_paths, images_sum):
         summary_vector = embeddings.embed_documents([summary])[0]
-        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'image_summary', 'content': summary, 'raw_image': image}))
+        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'image_summary', 'content': summary, 'filepath': image_path}))
 
     # Upsert to pinecone
     max_batch_size = 100
@@ -82,7 +114,7 @@ def get_vector_store(texts, text_sum, tables, tables_sum, images64, images_sum):
 async def get_conversational_chain():
     # Define the prompt template
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a friendly chatbot at an automobile company. Your task is to give detailed answers to users questions in a few sentences based on the context provided. If the query is not relevant to the context, you need to respond with: Sorry I couldn't find anything relevant, try asking again."),
+        ("system", "You are a friendly chatbot at an automobile company. Your task is to give detailed answers to users questions in a few sentences based on the context provided. If the query is not relevant to the context, you MUST respond with: {Sorry I couldn't find anything relevant, try asking again.}"),
         ("human", "context: {context}\n\nQuestion: {question}")
     ])
 
@@ -167,21 +199,28 @@ def main():
                 if new_files:
                     with st.status("Please wait as we process your input files...", expanded=True) as status:
                         st.write("Extracting data from Documents...")
+                        start_time = time.time()
                         for new_file in new_files:
                             # Extract data
-                            texts, tables = processInput(new_file)
+                            texts, tables, folder_id = processInput(new_file)
                             status.update(label="Successfully extracted data!", state="running", expanded=True)
+                            st.write(f'Extracted {len(texts)} text chunks and {len(tables)} tables')
+                            st.write(f"Extracted data in : {time.time()-start_time:.2f} s")
 
                             # Generate summaries of data
                             st.write("Summarizing data...")
                             text_summ, table_summ = generate_summaries(model, texts, tables)
-                            image_summ, image_64 = generate_image_summaries(model, "./figures")
+                            image_summ, image_paths = generate_image_summaries(model, folder_id)
+                            st.write(f'Extracted {len(image_paths)} images and summarized {len(image_summ)}')
+
                             status.update(label="Successfully summarized data", state="running", expanded=True)
+                            st.write(f"Summarized data in : {time.time()-start_time:.2f} s")
 
                             # Convert to embeddings and store in pinecone
                             st.write("Converting text to embeddings...")
-                            get_vector_store(texts, text_summ, tables, table_summ, image_64, image_summ)
+                            get_vector_store(texts, text_summ, tables, table_summ, image_paths, image_summ)
                             status.update(label="Successfully stored embeddings", state="running", expanded=True)
+                            st.write(f"Updated vector store in : {time.time()-start_time:.2f} s")
 
                             st.session_state.processed_files.append(new_file.name)
                         status.update(label="Processing Complete!", state="complete", expanded=False)

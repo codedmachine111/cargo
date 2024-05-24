@@ -4,6 +4,9 @@ import base64
 import PIL
 import PIL.Image
 
+MIN_IMAGE_HEIGHT = 50
+MIN_IMAGE_WIDTH = 50
+
 # Generate summarization prompt
 def summarize_prompt(element):
     prompt = f"""
@@ -30,7 +33,10 @@ def generate_summaries(model, texts, tables, summarize_texts=False):
         for table in tables:
             prompt = summarize_prompt(table)
             response = model.generate_content(prompt)
-            table_summaries.append(response.text)
+            if response and hasattr(response, 'text'):
+                table_summaries.append(response.text)
+            else:
+                table_summaries.append("Summary not available")
 
     return text_summaries, table_summaries
 
@@ -40,10 +46,10 @@ def encode_image(image_path):
         return base64.b64encode(image_file.read()).decode('utf-8')
 
 # Generate summaries for all images
-def generate_image_summaries(model, image_dir):
-    img_b64_list = []
+def generate_image_summaries(model, folder_id):
     image_summaries = []
-
+    image_filepaths=[]
+    image_dir = os.path.join('figures', folder_id)
     prompt = """
         You are an automotive assistant tasked with summarizing images for retrieval.
         These summaries will be embedded and used to retrieve the raw image. Describe 
@@ -53,13 +59,17 @@ def generate_image_summaries(model, image_dir):
     for filename in sorted(os.listdir(image_dir)):
         if filename.endswith(('.png', '.jpg', '.jpeg')):
             image_path = os.path.join(image_dir, filename)
-            b64_image = encode_image(image_path)
-            img_b64_list.append(b64_image)
 
             with PIL.Image.open(image_path) as img:
+                width, height = img.size
+
+                # Skip small images
+                if width < MIN_IMAGE_WIDTH or height < MIN_IMAGE_HEIGHT:
+                    continue
+                
                 response = model.generate_content([prompt, img])
-                image_summaries.append(response.text)
+                if response and hasattr(response, 'text'):
+                    image_summaries.append(response.text)
+                    image_filepaths.append(image_path)
 
-    shutil.rmtree(image_dir)
-    return image_summaries, img_b64_list
-
+    return image_summaries, image_filepaths
