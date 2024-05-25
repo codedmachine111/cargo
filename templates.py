@@ -1,4 +1,4 @@
-from base64 import b64encode
+from helpers import load_image_as_base64
 
 css = '''
 <style>
@@ -9,7 +9,7 @@ css = '''
     background-color: #2b313e
 }
 .chat-message.bot {
-    background-color: #475063
+    background-color: #1b1b1b
 }
 .chat-message .avatar {
   width: 20%;
@@ -32,11 +32,24 @@ css = '''
     padding: 1rem;
     border: 1px solid #ccc;
 }
-'''
 
-def load_image_as_base64(file_path):
-    with open(file_path, "rb") as image_file:
-        return b64encode(image_file.read()).decode("utf-8")
+#content{
+    display: flex;
+    flex-direction: column;
+}
+
+#images{
+    display: flex;
+    border-radius: 0.5rem;
+    flex-direction: row;
+    gap: 3;
+}
+
+#res_img{
+    width: 50%;
+    margin: 0.5rem;
+}
+'''
     
 captain_img = load_image_as_base64('./assets/captain.png')
 user_img = load_image_as_base64('./assets/user.png')
@@ -46,7 +59,10 @@ bot_template = f'''
     <div class="avatar">
         <img src="data:image/png;base64,{captain_img}" />
     </div>
-    <div class="message">{{{{MSG}}}}</div>
+    <div id="content">
+        <div class="message">{{{{MSG}}}}</div>
+        <div id="images">{{{{IMAGES}}}}</div>
+    </div>
 </div>
 '''
 

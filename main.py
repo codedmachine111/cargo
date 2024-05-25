@@ -10,7 +10,7 @@ from process_input import processInput
 from templates import css, user_template, bot_template
 from helpers import *
 
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 import google.generativeai as genai
 from pinecone import Pinecone, ServerlessSpec
 from langchain_core.prompts import ChatPromptTemplate
@@ -19,6 +19,9 @@ from langchain_pinecone import PineconeVectorStore
 from langchain.storage import InMemoryStore
 from langchain.schema.document import Document
 from langchain.retrievers.multi_vector import MultiVectorRetriever
+from langchain.chains.retrieval import create_retrieval_chain
+from langchain.chains.conversation.memory import ConversationSummaryMemory
+from langchain.chains.conversation.base import ConversationChain
 
 # Load environment variables
 load_dotenv()
@@ -75,10 +78,9 @@ safety_settings = [
 model = genai.GenerativeModel(model_name=MODEL_NAME, safety_settings=safety_settings)
 embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
-vectorstore = PineconeVectorStore(index=INDEX_NAME, embedding=embeddings)
+vectorstore = PineconeVectorStore.from_existing_index(index_name=INDEX_NAME, embedding=embeddings)
 store = InMemoryStore()
 id_key = "doc_id"
-
 retriever = MultiVectorRetriever(vectorstore=vectorstore, docstore=store, id_key=id_key)
 
 def get_vector_store(texts, text_sum, tables, tables_sum, image_paths, images_sum):
@@ -111,14 +113,27 @@ def get_vector_store(texts, text_sum, tables, tables_sum, image_paths, images_su
         except Exception as e:
             print(f"Error upserting vectors: {e}")
 
-async def get_conversational_chain():
-    # Define the prompt template
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a friendly chatbot at an automobile company. Your task is to give detailed answers to users questions in a few sentences based on the context provided. If the query is not relevant to the context, you MUST respond with: {Sorry I couldn't find anything relevant, try asking again.}"),
-        ("human", "context: {context}\n\nQuestion: {question}")
-    ])
+# async def get_conversational_chain():
+#     # Define the prompt template with memory integration
+#     prompt = ChatPromptTemplate.from_messages([
+#         ("system", "You are an automotive assistant at an automobile company. Your task is to give detailed answers to queries in a few sentences based on the context provided. The context can include text, table summaries or image summaries. If the query is not relevant to the context, you MUST respond with: Sorry I couldn't find anything relevant, try asking again."),
+#         ("human", "Context: {context} \n question: {question}")
+#     ])
+#     prompt.input_variables=["context", "question"]
+#     llm = ChatVertexAI(model=MODEL_NAME, convert_system_message_to_human=True)
+#     # memory = ConversationSummaryMemory(llm=llm, prompt=prompt)
+#     # chain = ConversationChain(llm=llm, memory=memory, prompt=prompt)
+#     chain = ConversationChain(llm=llm, prompt=prompt)
+#     return chain
 
+async def get_conversational_chain():
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are an automotive assistant at an automobile company. Your task is to give detailed answers to queries in a few sentences based on the context provided. The context can include text, table summaries or image summaries. If the query is not relevant to the context, you MUST respond with: Sorry I couldn't find anything relevant, try asking again."),
+        ("human", "Context: {context} \n question: {question}")
+    ])
+    prompt.input_variables = ["context", "question"]
     llm = ChatVertexAI(model="chat-bison@002", convert_system_message_to_human=True)
+    # chain = ConversationChain(llm=llm, prompt=prompt)
     chain = prompt | llm
     return chain
 
@@ -127,7 +142,6 @@ async def user_input(question):
         return "Please enter a valid prompt"
     
     # Convert question to embedding
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     query_vector = embeddings.embed_query(text=question)
 
     if isinstance(query_vector, list):
@@ -136,13 +150,32 @@ async def user_input(question):
         query_vector = list(query_vector)
 
     # Query Pinecone
-    docs = index.query(vector=query_vector, top_k=2, include_metadata=True).matches
+    docs = index.query(vector=query_vector, top_k=4, include_metadata=True).matches
 
     if not docs:
         return "Sorry, I couldn't find anything relevant in the knowledge base."
 
     # Collect context from the documents
-    context = "\n".join(doc.metadata["text"] if "text" in doc.metadata else doc.metadata["table-info"] for doc in docs)
+    text_data = []
+    table_data = []
+    image_summaries = []
+    files_to_display = []
+    for doc in docs:
+        metadata = doc.metadata
+        if 'raw_text' in metadata:
+            text_data.append(metadata['raw_text'])
+        elif 'raw_table' in metadata:
+            table_data.append(metadata['raw_table'])
+        elif 'filepath' in metadata:
+            files_to_display.append(metadata['filepath'])
+            image_summaries.append(metadata['content'])
+
+    context = "Text:\n" + "\n".join(text_data) + "\n\n" + \
+              "Tables:\n" + "\n".join(table_data) + "\n\n" + \
+              "Image summaries:\n" + "\n".join(image_summaries[:2])
+
+    images_to_display = [load_image_as_base64(filepath) for filepath in files_to_display[:2]]
+    images_html = "".join([f'<img src="data:image/png;base64,{img}" id="res_img"/>' for img in images_to_display])
 
     # Get the conversational chain
     chain = await get_conversational_chain()
@@ -150,11 +183,12 @@ async def user_input(question):
     # Prepare the inputs for the chain
     inputs = {
         "context": context,
-        "question": question
+        "question": question,
+        # "summary": "\n".join([msg["content"] for msg in st.session_state.chat_history if msg["role"] == "assistant"])
     }
 
     # Run the chain and get the response
-    response = chain.invoke(inputs)
+    response = chain.invoke(input=inputs)
 
     output_text = response.content if hasattr(response, 'content') else "Sorry, I couldn't generate a response."
     
@@ -162,10 +196,10 @@ async def user_input(question):
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    st.session_state.chat_history.append({"role": "user", "content": question})
-    st.session_state.chat_history.append({"role": "assistant", "content": output_text})
+    st.session_state.chat_history.append({"role": "user", "content": question, "images": None})
+    st.session_state.chat_history.append({"role": "assistant", "content": output_text, "images": images_html})
     
-    return output_text
+    return output_text, images_html
 
 def main():
     st.set_page_config(page_title="Cargo", page_icon=":ship:")
@@ -233,23 +267,26 @@ def main():
     for message in st.session_state.chat_history:
         if(message["role"] == "user"):
             with st.chat_message(message["role"], avatar="❓"):
-                st.write(user_template.replace("{{MSG}}", message["content"]), unsafe_allow_html=True)
+                st.write(user_template.replace("{{MSG}}", message["content"]).replace("{{IMAGES}}", message["images"] if message["images"] is not None else ""), unsafe_allow_html=True)
         else:
             with st.chat_message(message["role"], avatar="⚓"):
-                st.write(bot_template.replace("{{MSG}}", message["content"]), unsafe_allow_html=True)
+                st.write(bot_template.replace("{{MSG}}", message["content"]).replace("{{IMAGES}}", message["images"] if message["images"] is not None else ""), unsafe_allow_html=True)
     
     # User input
     if prompt := st.chat_input("Ask about your files..."):
-        if len(st.session_state.processed_files)>0 :
+        if len(st.session_state.processed_files)>=0 :
             # Display user message in chat message container
             with st.chat_message("user", avatar="❓"):
                 st.write(user_template.replace("{{MSG}}", prompt), unsafe_allow_html=True)
 
             with st.spinner("Thinking..."):
-                response = asyncio.run(user_input(prompt))
+                response, images = asyncio.run(user_input(prompt))
                 # Display assistant response in chat message container
                 with st.chat_message("assistant", avatar="⚓"):
-                    st.write(bot_template.replace("{{MSG}}", response), unsafe_allow_html=True)
+                    chat_history = st.session_state.chat_history[-1]
+                    response_images = chat_history["images"]
+                    bot_response = bot_template.replace("{{MSG}}", response).replace("{{IMAGES}}", images)
+                    st.write(bot_response, unsafe_allow_html=True)
         else:
             st.write("Please upload some documents to chat with them!")
 

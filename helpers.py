@@ -1,5 +1,5 @@
 import os
-import shutil
+from base64 import b64encode
 import base64
 import PIL
 import PIL.Image
@@ -73,3 +73,8 @@ def generate_image_summaries(model, folder_id):
                     image_filepaths.append(image_path)
 
     return image_summaries, image_filepaths
+
+
+def load_image_as_base64(file_path):
+    with open(file_path, "rb") as image_file:
+        return b64encode(image_file.read()).decode("utf-8")
