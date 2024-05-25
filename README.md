@@ -72,7 +72,7 @@ PROJECT_ID="YOUR-GOOGLE-CLOUD-PROJECT-ID"
 5. Install Tesseract OCR on your machine.\
 **For Windows:**
 - Download tesseract exe from [here](https://github.com/UB-Mannheim/tesseract/wiki).
-- Install the `.exe` file in `C:\Program Files (x86)\Tesseract-OCR`.
+- Install the `.exe` file in `C:\Program Files\Tesseract-OCR`.
 - Add a new path to the system environment variables:
   - On the Windows search bar, search for “Environment Variables.” You will find “Edit the System Variable.”
   - Next, in the “System Properties” window, click on the “Environment Variables” button.
