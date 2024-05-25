@@ -10,16 +10,11 @@ from process_input import processInput
 from templates import css, user_template, bot_template
 from helpers import *
 
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
 from pinecone import Pinecone, ServerlessSpec
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_vertexai import ChatVertexAI
-from langchain_pinecone import PineconeVectorStore
-from langchain.storage import InMemoryStore
-from langchain.schema.document import Document
-from langchain.retrievers.multi_vector import MultiVectorRetriever
-from langchain.chains.retrieval import create_retrieval_chain
 from langchain.chains.conversation.memory import ConversationSummaryMemory
 from langchain.chains.conversation.base import ConversationChain
 
@@ -78,11 +73,6 @@ safety_settings = [
 model = genai.GenerativeModel(model_name=MODEL_NAME, safety_settings=safety_settings)
 embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
-vectorstore = PineconeVectorStore.from_existing_index(index_name=INDEX_NAME, embedding=embeddings)
-store = InMemoryStore()
-id_key = "doc_id"
-retriever = MultiVectorRetriever(vectorstore=vectorstore, docstore=store, id_key=id_key)
-
 def get_vector_store(texts, text_sum, tables, tables_sum, image_paths, images_sum):
     '''
         Converts data into vector embeddings and saves it to vector store.
@@ -113,23 +103,10 @@ def get_vector_store(texts, text_sum, tables, tables_sum, image_paths, images_su
         except Exception as e:
             print(f"Error upserting vectors: {e}")
 
-# async def get_conversational_chain():
-#     # Define the prompt template with memory integration
-#     prompt = ChatPromptTemplate.from_messages([
-#         ("system", "You are an automotive assistant at an automobile company. Your task is to give detailed answers to queries in a few sentences based on the context provided. The context can include text, table summaries or image summaries. If the query is not relevant to the context, you MUST respond with: Sorry I couldn't find anything relevant, try asking again."),
-#         ("human", "Context: {context} \n question: {question}")
-#     ])
-#     prompt.input_variables=["context", "question"]
-#     llm = ChatVertexAI(model=MODEL_NAME, convert_system_message_to_human=True)
-#     # memory = ConversationSummaryMemory(llm=llm, prompt=prompt)
-#     # chain = ConversationChain(llm=llm, memory=memory, prompt=prompt)
-#     chain = ConversationChain(llm=llm, prompt=prompt)
-#     return chain
-
 async def get_conversational_chain():
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an automotive assistant at an automobile company. Your task is to give detailed answers to queries in a few sentences based on the context provided. The context can include text, table summaries or image summaries. If the query is not relevant to the context, you MUST respond with: Sorry I couldn't find anything relevant, try asking again."),
-        ("human", "Context: {context} \n question: {question}")
+        ("system", "You are an automotive assistant at an automobile company. Your task is to give detailed answers to queries in a few sentences based on the CONTEXT provided below. The CONTEXT can include text, table summaries or image summaries. If the QUESTION is not relevant to the CONTEXT, you MUST respond with: SORRY I COULD NOT FIND ANYTHING RELEVANT. If QUESTION is a greeting, reply with HOW MAY I HELP YOU"),
+        ("human", "CONTEXT: {context} \n QUESTION: {question}")
     ])
     prompt.input_variables = ["context", "question"]
     llm = ChatVertexAI(model="chat-bison@002", convert_system_message_to_human=True)
