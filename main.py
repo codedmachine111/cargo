@@ -13,10 +13,7 @@ from helpers import *
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
 from pinecone import Pinecone, ServerlessSpec
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_google_vertexai import ChatVertexAI
-from langchain.chains.conversation.memory import ConversationSummaryMemory
-from langchain.chains.conversation.base import ConversationChain
+from vertexai.preview.language_models import ChatModel, ChatMessage, ChatSession
 
 # Load environment variables
 load_dotenv()
@@ -103,16 +100,24 @@ def get_vector_store(texts, text_sum, tables, tables_sum, image_paths, images_su
         except Exception as e:
             print(f"Error upserting vectors: {e}")
 
-async def get_conversational_chain():
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an automotive assistant at an automobile company. Your task is to give detailed answers to queries in a few sentences based on the CONTEXT provided below. The CONTEXT can include text, table summaries or image summaries. If the QUESTION is not relevant to the CONTEXT, you MUST respond with: SORRY I COULD NOT FIND ANYTHING RELEVANT. If QUESTION is a greeting, reply with HOW MAY I HELP YOU"),
-        ("human", "CONTEXT: {context} \n QUESTION: {question}")
-    ])
-    prompt.input_variables = ["context", "question"]
-    llm = ChatVertexAI(model="chat-bison@002", convert_system_message_to_human=True)
-    # chain = ConversationChain(llm=llm, prompt=prompt)
-    chain = prompt | llm
-    return chain
+system_context = "You are an automotive assistant at an automobile company.\
+Your task is to give detailed answers to queries in a few sentences \
+based on the CONTEXT provided. The CONTEXT can include text, table summaries\
+or image summaries. If the QUESTION is not related to automobiles, you MUST \
+respond with: SORRY I COULD NOT FIND ANYTHING RELEVANT. If QUESTION is a greeting,\
+reply with HOW MAY I HELP YOU. If the QUESTION is very vague, you MUST ask a follow-up question to get more clarity. \
+If you dont know about the car name, you MUST ask for it"
+
+chat_model = ChatModel.from_pretrained("chat-bison@002")
+
+def get_response(message, context, history):
+    chat_history=[]
+    for h in history:
+        chat_history.append(ChatMessage(h["content"], h["role"]))
+    
+    chat = ChatSession(model=chat_model, context=context, message_history=chat_history)
+    response = chat.send_message(message)
+    return response
 
 async def user_input(question):
     if len(question) == 0:
@@ -154,28 +159,16 @@ async def user_input(question):
     images_to_display = [load_image_as_base64(filepath) for filepath in files_to_display[:2]]
     images_html = "".join([f'<img src="data:image/png;base64,{img}" id="res_img"/>' for img in images_to_display])
 
-    # Get the conversational chain
-    chain = await get_conversational_chain()
-    
-    # Prepare the inputs for the chain
-    inputs = {
-        "context": context,
-        "question": question,
-        # "summary": "\n".join([msg["content"] for msg in st.session_state.chat_history if msg["role"] == "assistant"])
-    }
+    output_text = get_response(question, system_context+context, st.session_state.chat_history)
+    output_text = output_text.text
 
-    # Run the chain and get the response
-    response = chain.invoke(input=inputs)
-
-    output_text = response.content if hasattr(response, 'content') else "Sorry, I couldn't generate a response."
-    
     # Update chat history
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
     st.session_state.chat_history.append({"role": "user", "content": question, "images": None})
     st.session_state.chat_history.append({"role": "assistant", "content": output_text, "images": images_html})
-    
+
     return output_text, images_html
 
 def main():
