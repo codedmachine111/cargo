@@ -10,3 +10,4 @@ google-cloud-aiplatform
 pytesseract
 pillow
 langchain_pinecone
+cloudinary

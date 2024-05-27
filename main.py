@@ -9,7 +9,9 @@ from dotenv import load_dotenv
 from process_input import processInput
 from templates import css, user_template, bot_template
 from helpers import *
+from utils import *
 
+import cloudinary
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
 from pinecone import Pinecone, ServerlessSpec
@@ -26,7 +28,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Configure Pinecone
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-INDEX_NAME = "pdf-index"
+INDEX_NAME = "demo"
 
 # Ensure the index exists in pinecone
 if INDEX_NAME not in pc.list_indexes().names():
@@ -42,6 +44,12 @@ if INDEX_NAME not in pc.list_indexes().names():
 
 # Connect to the pinecone index
 index = pc.Index(INDEX_NAME)
+
+CLOUD_NAME = os.getenv("CLOUDINARY_NAME")
+CLOUD_API_KEY = os.getenv("CLOUDINARY_API_KEY")
+CLOUD_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
+
+cloudinary.config(cloud_name=CLOUD_NAME, api_key=CLOUD_API_KEY, api_secret=CLOUD_API_SECRET)
 
 # Define summarization model
 MODEL_NAME = "models/gemini-1.5-pro-latest"
@@ -193,7 +201,7 @@ def main():
         st.divider()
         st.header("Upload your files and start talking with the captain! :open_file_folder:")
 
-        uploaded_files = st.file_uploader(type=['pdf', 'zip'], label="Click below or drag and drop your files to upload!", accept_multiple_files=True)
+        uploaded_files = st.file_uploader(type=['pdf'], label="Click below or drag and drop your files to upload!", accept_multiple_files=True)
 
         if st.button("Process"):
             # Process the input files accordingly
@@ -253,8 +261,6 @@ def main():
                 response, images = asyncio.run(user_input(prompt))
                 # Display assistant response in chat message container
                 with st.chat_message("assistant", avatar="⚓"):
-                    chat_history = st.session_state.chat_history[-1]
-                    response_images = chat_history["images"]
                     bot_response = bot_template.replace("{{MSG}}", response).replace("{{IMAGES}}", images)
                     st.write(bot_response, unsafe_allow_html=True)
         else:

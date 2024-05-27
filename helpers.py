@@ -3,6 +3,7 @@ from base64 import b64encode
 import base64
 import PIL
 import PIL.Image
+from utils import *
 
 MIN_IMAGE_HEIGHT = 50
 MIN_IMAGE_WIDTH = 50
@@ -70,7 +71,9 @@ def generate_image_summaries(model, folder_id):
                 response = model.generate_content([prompt, img])
                 if response and hasattr(response, 'text'):
                     image_summaries.append(response.text)
-                    image_filepaths.append(image_path)
+                    # upload image to cloudinary and get url
+                    url = upload_image(image_path)
+                    image_filepaths.append(url)
 
     return image_summaries, image_filepaths
 
