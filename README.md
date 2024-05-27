@@ -64,10 +64,14 @@ python -m venv venv
 PINECONE_API_KEY= "YOUR-API-KEY"
 GOOGLE_API_KEY= "YOUR-API-KEY"
 PROJECT_ID="YOUR-GOOGLE-CLOUD-PROJECT-ID"
+CLOUDINARY_NAME="YOUR-CLOUDINARY-CLOUD-NAME"
+CLOUDINARY_API_KEY="YOUR-CLOUDINARY-API-KEY"
+CLOUDINARY_API_SECRET="YOUR-CLOUDINARY-API-SECRET"
 ```
-> **Note**
-> You need to get your Google API key from [here](https://aistudio.google.com/)
-> and your Pinecone API key from [here](https://www.pinecone.io/)
+> ### **Note**
+> You need to get your Google API key from [here](https://aistudio.google.com/)\
+> Pinecone API key from [here](https://www.pinecone.io/)\
+> Go to [cloudinary](https://cloudinary.com/), create a new account. Navigate to Media Library -> Settings -> API keys to find your credentials. Your Cloud name will be displayed on top left of console.
 
 5. Install Tesseract OCR on your machine.\
 **For Windows:**
