@@ -164,8 +164,7 @@ async def user_input(question):
               "Tables:\n" + "\n".join(table_data) + "\n\n" + \
               "Image summaries:\n" + "\n".join(image_summaries[:2])
 
-    images_to_display = [load_image_as_base64(filepath) for filepath in files_to_display[:2]]
-    images_html = "".join([f'<img src="data:image/png;base64,{img}" id="res_img"/>' for img in images_to_display])
+    images_html = "".join([f'<img src="{img}" id="res_img"/>' for img in files_to_display[:2]])
 
     output_text = get_response(question, system_context+context, st.session_state.chat_history)
     output_text = output_text.text
