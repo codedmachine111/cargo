@@ -3,6 +3,7 @@ import uuid
 import time
 import asyncio
 import streamlit as st
+from streamlit_float import float_init
 from streamlit_extras.add_vertical_space import add_vertical_space
 from dotenv import load_dotenv
 
@@ -28,7 +29,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Configure Pinecone
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-INDEX_NAME = "demo"
+INDEX_NAME = "main"
 
 # Ensure the index exists in pinecone
 if INDEX_NAME not in pc.list_indexes().names():
@@ -116,6 +117,10 @@ respond with: SORRY I COULD NOT FIND ANYTHING RELEVANT. If QUESTION is a greetin
 reply with HOW MAY I HELP YOU. If the QUESTION is very vague, you MUST ask a follow-up question to get more clarity. \
 If you dont know about the car name, you MUST ask for it"
 
+system_image_context = "You are an automotive assistant at an automobile company.\
+Your task is to summarize the CONTEXT provided. The CONTEXT can include text, table summaries\
+or image summaries."
+
 chat_model = ChatModel.from_pretrained("chat-bison@002")
 
 def get_response(message, context, history):
@@ -127,12 +132,15 @@ def get_response(message, context, history):
     response = chat.send_message(message)
     return response
 
-async def user_input(question):
-    if len(question) == 0:
-        return "Please enter a valid prompt"
-    
-    # Convert question to embedding
-    query_vector = embeddings.embed_query(text=question)
+async def user_input(question="", image=False, image_path="", cloud_url=""):
+    summary=""
+    if image:
+        summary += summarize_image(model, image_path)
+        query_vector = embeddings.embed_query(text=summary)
+    else:
+        if len(question) == 0:
+            return "Please enter a valid prompt", ""
+        query_vector = embeddings.embed_query(text=question)
 
     if isinstance(query_vector, list):
         query_vector = [float(val) for val in query_vector]
@@ -141,7 +149,6 @@ async def user_input(question):
 
     # Query Pinecone
     docs = index.query(vector=query_vector, top_k=4, include_metadata=True).matches
-
     if not docs:
         return "Sorry, I couldn't find anything relevant in the knowledge base."
 
@@ -164,26 +171,34 @@ async def user_input(question):
               "Tables:\n" + "\n".join(table_data) + "\n\n" + \
               "Image summaries:\n" + "\n".join(image_summaries[:2])
 
-    images_html = "".join([f'<img src="{img}" id="res_img"/>' for img in files_to_display[:2]])
+    query_image_html = f'<img src="{cloud_url}" id="res_img"/>'
+    if image:
+        images_html = ""
+    else:
+        images_html = "".join([f'<img src="{img}" id="res_img"/>' for img in files_to_display[:2]])
 
-    output_text = get_response(question, system_context+context, st.session_state.chat_history)
+    if image:
+        output_text = get_response(summary, system_image_context+context, st.session_state.chat_history)
+    else:
+        output_text = get_response(question, system_context+context, st.session_state.chat_history)
     output_text = output_text.text
 
     # Update chat history
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    st.session_state.chat_history.append({"role": "user", "content": question, "images": None})
+    st.session_state.chat_history.append({"role": "user", "content": question, "images": query_image_html})
     st.session_state.chat_history.append({"role": "assistant", "content": output_text, "images": images_html})
 
     return output_text, images_html
 
 def main():
-    st.set_page_config(page_title="Cargo", page_icon=":ship:")
+    st.set_page_config(page_title="Cargo", page_icon=":ship:", layout="wide")
     st.image('./assets/captain.png', width=200)
     st.header("Ask the Captain about your files! :male-pilot:")
     st.write(css, unsafe_allow_html=True)
-    
+    float_init()
+
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     if 'processed_files' not in st.session_state:
@@ -240,30 +255,70 @@ def main():
             else:
                 st.write("No PDFs uploaded.")
 
-    # Load initial chat
-    for message in st.session_state.chat_history:
-        if(message["role"] == "user"):
-            with st.chat_message(message["role"], avatar="❓"):
-                st.write(user_template.replace("{{MSG}}", message["content"]).replace("{{IMAGES}}", message["images"] if message["images"] is not None else ""), unsafe_allow_html=True)
-        else:
-            with st.chat_message(message["role"], avatar="⚓"):
-                st.write(bot_template.replace("{{MSG}}", message["content"]).replace("{{IMAGES}}", message["images"] if message["images"] is not None else ""), unsafe_allow_html=True)
-    
-    # User input
-    if prompt := st.chat_input("Ask about your files..."):
-        if len(st.session_state.processed_files)>=0 :
-            # Display user message in chat message container
-            with st.chat_message("user", avatar="❓"):
-                st.write(user_template.replace("{{MSG}}", prompt), unsafe_allow_html=True)
+    col1, col2 = st.columns([9, 4])
+        
+    with col1:
+        container = st.container(height=600, border=True)
+        # Load initial chat
+        for message in st.session_state.chat_history:
+            if(message["role"] == "user"):
+                with container:
+                    with st.chat_message(message["role"], avatar="❓"):
+                        st.write(user_template.replace("{{MSG}}", message["content"]).replace("{{IMAGE}}", message["images"] if message["images"] is not None else ""), unsafe_allow_html=True)
+            else:
+                with container:
+                    with st.chat_message(message["role"], avatar="⚓"):
+                            st.write(bot_template.replace("{{MSG}}", message["content"]).replace("{{IMAGES}}", message["images"] if message["images"] is not None else ""), unsafe_allow_html=True)
 
-            with st.spinner("Thinking..."):
-                response, images = asyncio.run(user_input(prompt))
-                # Display assistant response in chat message container
-                with st.chat_message("assistant", avatar="⚓"):
-                    bot_response = bot_template.replace("{{MSG}}", response).replace("{{IMAGES}}", images)
-                    st.write(bot_response, unsafe_allow_html=True)
-        else:
-            st.write("Please upload some documents to chat with them!")
+        # User input
+        if prompt := st.chat_input("Ask about your files..."):
+            if len(st.session_state.processed_files)>=0 :
+                # Display user message in chat message container
+                with container:
+                    with st.chat_message("user", avatar="❓"):
+                        st.write(user_template.replace("{{MSG}}", prompt).replace("{{IMAGE}}", ""), unsafe_allow_html=True)
+
+                with st.spinner("Thinking..."):
+                    response, images = asyncio.run(user_input(question=prompt))
+                    # Display assistant response in chat message container
+                    with container:
+                        with st.chat_message("assistant", avatar="⚓"):
+                            bot_response = bot_template.replace("{{MSG}}", response).replace("{{IMAGES}}", images)
+                            st.write(bot_response, unsafe_allow_html=True)
+            else:
+                st.write("Please upload some documents to chat with them!")
+
+    with col2:
+        container1 = st.container()
+        with container1:
+            image_query = st.file_uploader(type=['png', 'jpg', 'jpeg'], label="Search an image", accept_multiple_files=False)
+            if image_query is not None:
+                st.image(image_query, width=200)
+
+            if st.button("Search"):
+                if image_query is None:
+                    st.write("No images selected!")
+                else:
+                    query_img_path = f"./{image_query.name}"
+                    # Save the uploaded file to the local path
+                    with open(query_img_path, "wb") as f:
+                        f.write(image_query.getbuffer())
+
+                    # Upload image to cloudinary
+                    image_query_url = upload_image(query_img_path)
+                    image_query_html = f'<img src="{image_query_url}" id="res_img"/>'
+
+                    with container:
+                        with st.chat_message("user", avatar="❓"):
+                            st.write(user_template.replace("{{MSG}}", "").replace("{{IMAGE}}", image_query_html), unsafe_allow_html=True)
+
+                    with st.spinner("Thinking..."):
+                        response, images = asyncio.run(user_input(image=True, image_path=query_img_path, cloud_url=image_query_url))
+
+                        with container:
+                            with st.chat_message("assistant", avatar="⚓"):
+                                bot_response = bot_template.replace("{{MSG}}", response).replace("{{IMAGES}}", images)
+                                st.write(bot_response, unsafe_allow_html=True)
 
 if __name__ == '__main__':
     main()

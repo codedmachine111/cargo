@@ -49,6 +49,7 @@ css = '''
     width: 50%;
     margin: 0.5rem;
 }
+
 '''
     
 captain_img = load_image_as_base64('./assets/captain.png')
@@ -71,6 +72,9 @@ user_template = f'''
     <div class="avatar">
         <img src="data:image/png;base64,{user_img}" />
     </div>    
-    <div class="message">{{{{MSG}}}}</div>
+    <div id="content">
+        <div class="message">{{{{MSG}}}}</div>
+        <div id="images">{{{{IMAGE}}}}</div>
+    </div>
 </div>
 '''

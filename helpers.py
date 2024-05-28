@@ -4,6 +4,7 @@ import base64
 import PIL
 import PIL.Image
 from utils import *
+import shutil
 
 MIN_IMAGE_HEIGHT = 50
 MIN_IMAGE_WIDTH = 50
@@ -55,6 +56,7 @@ def generate_image_summaries(model, folder_id):
         You are an automotive assistant tasked with summarizing images for retrieval.
         These summaries will be embedded and used to retrieve the raw image. Describe 
         conciesly the characters (shape, color), and infer a little what the image means.
+        If the image is a table or has a table, extract all data from it and summarize it.
     """
 
     for filename in sorted(os.listdir(image_dir)):
@@ -74,10 +76,28 @@ def generate_image_summaries(model, folder_id):
                     # upload image to cloudinary and get url
                     url = upload_image(image_path)
                     image_filepaths.append(url)
-
+    shutil.rmtree(image_dir)
     return image_summaries, image_filepaths
 
 
 def load_image_as_base64(file_path):
     with open(file_path, "rb") as image_file:
         return b64encode(image_file.read()).decode("utf-8")
+    
+def summarize_image(model, image_path):
+    prompt = """
+        You are an automotive assistant tasked with summarizing images for retrieval.
+        These summaries will be embedded and used to retrieve the raw image. Describe 
+        conciesly the characters (shape, color), and infer a little what the image means.
+        If the image is a table or has a table, extract data from the table and summarize it.
+    """
+    summary=""
+    with PIL.Image.open(image_path) as img:
+        response = model.generate_content([prompt, img])
+    
+        if response and hasattr(response, 'text'):
+            summary += response.text
+        else:
+            summary += "Sorry could not analyse the image. Try again"
+    os.remove(image_path)
+    return summary
