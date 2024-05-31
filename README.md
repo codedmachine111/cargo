@@ -2,8 +2,7 @@
 > This project is a part of BGSW (Bosch) GenAI Hackathon.
 <p align="center">
 
-  <img src="https://github.com/codedmachine111/cargo/assets/88738817/3fd48a95-42b1-42c9-bf8e-fcac29bce4c6" alt="cargo-banner" width="120">
-  <img src="https://github.com/codedmachine111/cargo/assets/88738817/26f0b566-4950-404a-8757-b711d00fa97c" alt="cargo-banner" width="400">
+  <img src="https://github.com/codedmachine111/cargo/assets/88738817/3672b024-1f5e-45fa-b179-9aa03e4087dd" alt="cargo-banner" width="700">
 
 </p>
 
@@ -13,10 +12,11 @@ Cargo is an RAG designed to allow users to chat with multiple large PDF document
 
 ## Features
 
-- Upload multiple PDF files.
-- Chat Engine integration.
-- Analyses texts, tables and images in a PDF document.
+- Q&A with multiple PDFs.
+- Analyses texts, tables and images in given documents.
 - LLM integration for intelligent responses.
+- Efficient search and data retrieval.
+- Search using images.
 
 ## Tools used
 <p align="left">
@@ -25,6 +25,7 @@ Cargo is an RAG designed to allow users to chat with multiple large PDF document
    <img src="https://github.com/codedmachine111/cargo/assets/88738817/bc76a436-7900-4a65-ade3-fb22b70cf08b" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/cargo/assets/88738817/ef687319-cf5c-49d0-9a95-cbd209c0a95b" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/cargo/assets/88738817/e8e4d829-1c2b-4545-a719-093fecb9ac9d" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+   <img src="https://github.com/codedmachine111/cargo/assets/88738817/dcbb61a0-27cf-410b-905a-946782d39cea" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
    <img src="https://github.com/codedmachine111/abridge/assets/88738817/2fb73136-6d50-423f-b4a0-1962b8e6914b" height="50px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 </p>
 
@@ -33,6 +34,7 @@ Cargo is an RAG designed to allow users to chat with multiple large PDF document
 - **Vertex AI**: Machine learning platform by Google that gives access to Large Language Models.
 - **Google AI studio**: platform that gives access to a text embedding model and Gemini.
 - **Unstructured**:  Core library for partitioning, cleaning, and chunking documents types for LLM applications.
+- **Cloudinary**: provides a secure and comprehensive API for easily uploading media files 
 - **Streamlit**: allows for the rapid development of interactive web applications with minimal coding effort.
 
 ## Architecture
