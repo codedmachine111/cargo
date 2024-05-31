@@ -118,7 +118,13 @@ reply with HOW MAY I HELP YOU. If the QUESTION is very vague, you MUST ask a fol
 If you dont know about the car name, you MUST ask for it"
 
 system_image_context = "You are an automotive assistant at an automobile company.\
-Your task is to summarize the CONTEXT provided. The CONTEXT can include text, table summaries\
+You are given with a summary of an image, summarized using an LLM. You are also given\
+with CONTEXT of similar images in the manual. Your task is to frame a QUERY for retrieving \
+relevant documents from the manual related to the image"
+
+system_image_reply="You are an automotive assistant at an automobile company.\
+based on the provided CONTEXT, Your task is to give detailed answers to queries in a few sentences \
+based on the CONTEXT provided. The CONTEXT can include text, table summaries\
 or image summaries."
 
 chat_model = ChatModel.from_pretrained("chat-bison@002")
@@ -132,15 +138,56 @@ def get_response(message, context, history):
     response = chat.send_message(message)
     return response
 
-async def user_input(question="", image=False, image_path="", cloud_url=""):
-    summary=""
-    if image:
-        summary += summarize_image(model, image_path)
-        query_vector = embeddings.embed_query(text=summary)
+def handle_image_query(image_path="", cloud_url=""):
+    summary = summarize_image(model, image_path)
+    st.write("Image summary:")
+    st.write(summary)
+
+    output_text = get_response(summary, system_image_context, st.session_state.chat_history)
+    output_text = output_text.text
+
+    query_vector = embeddings.embed_query(text=output_text)
+
+    if isinstance(query_vector, list):
+        query_vector = [float(val) for val in query_vector]
     else:
-        if len(question) == 0:
-            return "Please enter a valid prompt", ""
-        query_vector = embeddings.embed_query(text=question)
+        query_vector = list(query_vector)
+
+    docs = index.query(vector=query_vector, top_k=4, include_metadata=True).matches
+    if not docs:
+        return "Sorry, I couldn't find anything relevant in the knowledge base.", ""
+    
+    text_data = []
+    table_data = []
+    image_summaries = []
+    files_to_display = []
+    for doc in docs:
+        metadata = doc.metadata
+        if 'raw_text' in metadata:
+            text_data.append(metadata['raw_text'])
+        elif 'raw_table' in metadata:
+            table_data.append(metadata['raw_table'])
+        elif 'filepath' in metadata:
+            files_to_display.append(metadata['filepath'])
+            image_summaries.append(metadata['content'])
+
+    context = "CONTEXT : \n Text:\n" + "\n".join(text_data) + "\n\n" + \
+              "Tables:\n" + "\n".join(table_data) + "\n\n" + \
+              "Image summaries:\n" + "\n".join(image_summaries[:2])
+    query_image_html = f'<img src="{cloud_url}" id="res_img"/>'
+
+    response = get_response(summary, system_image_reply+context , st.session_state.chat_history)
+    response = response.text
+
+    st.session_state.chat_history.append({"role": "user", "content": summary, "images": query_image_html})
+    st.session_state.chat_history.append({"role": "assistant", "content": response, "images": ""})
+    return response, ""
+
+async def user_input(question):
+
+    if len(question) == 0:
+        return "Please enter a valid prompt", ""
+    query_vector = embeddings.embed_query(text=question)
 
     if isinstance(query_vector, list):
         query_vector = [float(val) for val in query_vector]
@@ -167,27 +214,20 @@ async def user_input(question="", image=False, image_path="", cloud_url=""):
             files_to_display.append(metadata['filepath'])
             image_summaries.append(metadata['content'])
 
-    context = "Text:\n" + "\n".join(text_data) + "\n\n" + \
+    context = "CONTEXT : \n Text:\n" + "\n".join(text_data) + "\n\n" + \
               "Tables:\n" + "\n".join(table_data) + "\n\n" + \
               "Image summaries:\n" + "\n".join(image_summaries[:2])
 
-    query_image_html = f'<img src="{cloud_url}" id="res_img"/>'
-    if image:
-        images_html = ""
-    else:
-        images_html = "".join([f'<img src="{img}" id="res_img"/>' for img in files_to_display[:2]])
+    images_html = "".join([f'<img src="{img}" id="res_img"/>' for img in files_to_display[:2]])
 
-    if image:
-        output_text = get_response(summary, system_image_context+context, st.session_state.chat_history)
-    else:
-        output_text = get_response(question, system_context+context, st.session_state.chat_history)
+    output_text = get_response(question, system_context+context, st.session_state.chat_history)
     output_text = output_text.text
 
     # Update chat history
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    st.session_state.chat_history.append({"role": "user", "content": question, "images": query_image_html})
+    st.session_state.chat_history.append({"role": "user", "content": question, "images": ""})
     st.session_state.chat_history.append({"role": "assistant", "content": output_text, "images": images_html})
 
     return output_text, images_html
@@ -264,11 +304,11 @@ def main():
             if(message["role"] == "user"):
                 with container:
                     with st.chat_message(message["role"], avatar="❓"):
-                        st.write(user_template.replace("{{MSG}}", message["content"]).replace("{{IMAGE}}", message["images"] if message["images"] is not None else ""), unsafe_allow_html=True)
+                        st.write(user_template.replace("{{MSG}}", message["content"].capitalize()).replace("{{IMAGE}}", message["images"] if message["images"] is not None else ""), unsafe_allow_html=True)
             else:
                 with container:
                     with st.chat_message(message["role"], avatar="⚓"):
-                            st.write(bot_template.replace("{{MSG}}", message["content"]).replace("{{IMAGES}}", message["images"] if message["images"] is not None else ""), unsafe_allow_html=True)
+                            st.write(bot_template.replace("{{MSG}}", message["content"].capitalize()).replace("{{IMAGES}}", message["images"] if message["images"] is not None else ""), unsafe_allow_html=True)
 
         # User input
         if prompt := st.chat_input("Ask about your files..."):
@@ -276,14 +316,14 @@ def main():
                 # Display user message in chat message container
                 with container:
                     with st.chat_message("user", avatar="❓"):
-                        st.write(user_template.replace("{{MSG}}", prompt).replace("{{IMAGE}}", ""), unsafe_allow_html=True)
+                        st.write(user_template.replace("{{MSG}}", prompt.capitalize()).replace("{{IMAGE}}", ""), unsafe_allow_html=True)
 
                 with st.spinner("Thinking..."):
                     response, images = asyncio.run(user_input(question=prompt))
                     # Display assistant response in chat message container
                     with container:
                         with st.chat_message("assistant", avatar="⚓"):
-                            bot_response = bot_template.replace("{{MSG}}", response).replace("{{IMAGES}}", images)
+                            bot_response = bot_template.replace("{{MSG}}", response.capitalize()).replace("{{IMAGES}}", images)
                             st.write(bot_response, unsafe_allow_html=True)
             else:
                 st.write("Please upload some documents to chat with them!")
@@ -313,11 +353,11 @@ def main():
                             st.write(user_template.replace("{{MSG}}", "").replace("{{IMAGE}}", image_query_html), unsafe_allow_html=True)
 
                     with st.spinner("Thinking..."):
-                        response, images = asyncio.run(user_input(image=True, image_path=query_img_path, cloud_url=image_query_url))
+                        response, images = handle_image_query(image_path=query_img_path, cloud_url=image_query_url)
 
                         with container:
                             with st.chat_message("assistant", avatar="⚓"):
-                                bot_response = bot_template.replace("{{MSG}}", response).replace("{{IMAGES}}", images)
+                                bot_response = bot_template.replace("{{MSG}}", response.capitalize()).replace("{{IMAGES}}", images)
                                 st.write(bot_response, unsafe_allow_html=True)
 
 if __name__ == '__main__':
