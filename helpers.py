@@ -1,16 +1,24 @@
 import os
 from base64 import b64encode
-import base64
 import PIL
 import PIL.Image
 from utils import *
 import shutil
 
+# Threshold to avoid smaller images
 MIN_IMAGE_HEIGHT = 50
 MIN_IMAGE_WIDTH = 50
 
-# Generate summarization prompt
 def summarize_prompt(element):
+    '''
+        Creates a prompt for summarizing a text or table element.
+
+        Parameters:
+        element (str): The text or table element to be summarized.
+
+        Returns:
+        str: A formatted prompt for generating a summary.
+    '''
     prompt = f"""
         You are an assistant tasked with summarizing tables and text for retrieval.
         These summaries will be embedded and used to retrieve the raw text and table 
@@ -18,8 +26,20 @@ def summarize_prompt(element):
         for retrieval. Table or text: {element}"""
     return prompt
 
-# Generate summaries
 def generate_summaries(model, texts, tables, summarize_texts=False):
+    '''
+        Generates summaries for texts and tables using a given model.
+
+        Parameters:
+        model: The model used to generate the summaries.
+        texts (list): List of text data.
+        tables (list): List of table data.
+        summarize_texts (bool): Flag to indicate if texts should be summarized. Default is False.
+
+        Returns:
+        list: Summaries of the texts.
+        list: Summaries of the tables.
+    '''
     text_summaries=[]
     table_summaries=[]
 
@@ -42,13 +62,18 @@ def generate_summaries(model, texts, tables, summarize_texts=False):
 
     return text_summaries, table_summaries
 
-# Encode image to base64 string
-def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
-
-# Generate summaries for all images
 def generate_image_summaries(model, folder_id):
+    '''
+        Generates summaries for images in a specified folder using a given model and uploads them to the cloud.
+
+        Parameters:
+        model: The model used to generate the image summaries.
+        folder_id (str): ID of the folder containing the extracted images.
+
+        Returns:
+        list: Summaries of the images.
+        list: Cloudinary URLs of the uploaded images.
+    '''
     image_summaries = []
     image_filepaths=[]
     image_dir = os.path.join('figures', folder_id)
@@ -79,12 +104,30 @@ def generate_image_summaries(model, folder_id):
     shutil.rmtree(image_dir)
     return image_summaries, image_filepaths
 
-
 def load_image_as_base64(file_path):
+    '''
+        Loads an image file and encodes it as a base64 string.
+
+        Parameters:
+        file_path (str): Path to the image file.
+
+        Returns:
+        str: Base64 encoded string of the image.
+    '''
     with open(file_path, "rb") as image_file:
         return b64encode(image_file.read()).decode("utf-8")
     
 def summarize_image(model, image_path):
+    '''
+        Generates a summary for an image using a given model.
+
+        Parameters:
+        model: The model used to generate the image summary.
+        image_path (str): Path to the image file.
+
+        Returns:
+        str: The generated image summary.
+    '''
     prompt = """
         You are an automotive assistant tasked with summarizing images for retrieval.
         These summaries will be embedded and used to retrieve the raw image. Describe 
@@ -101,20 +144,3 @@ def summarize_image(model, image_path):
             summary += "Sorry could not analyse the image. Try again"
     os.remove(image_path)
     return summary
-
-def get_car_name(model, texts):
-    content=""
-    for text in texts:
-        content += text
-
-    prompt = f"""
-        You are an automotive assistant tasked with naming ONLY THE NAME OF THE CAR, \
-        based on the CONTEXT provided \n: CONTEXT: {content}"""
-    
-    response = model.generate_content(prompt)
-
-    if response and hasattr(response, 'text'):
-        response = response.text.upper()
-    else:
-        response = "Unknown"
-    return response

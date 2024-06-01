@@ -3,12 +3,21 @@ import tempfile
 import pytesseract
 import uuid
 import os
-
 from unstructured.partition.pdf import partition_pdf
+
+# Configure Pytesseract
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-# Slower but accurate extraction
 def extract_all_data(pdf_path):
+    '''
+        Extracts text, tables and images from a PDF file and saves the images to a specified directory.
+
+        Parameters:
+        pdf_path (str): Path to the PDF file.
+
+        Returns:
+        tuple: Lists of text elements, table elements, and a unique folder ID for the extracted images.
+    '''
     text_elements = []
     table_elements = []
 
@@ -19,7 +28,7 @@ def extract_all_data(pdf_path):
     raw_elements = partition_pdf(
         filename=pdf_path,
         chunking_strategy="by_title",
-        extract_images_in_pdf=False,
+        extract_images_in_pdf=True,
         infer_table_structure=True,
         max_characters=1000,
         new_after_n_chars=1500,
@@ -36,10 +45,16 @@ def extract_all_data(pdf_path):
 
     return text_elements, table_elements, unique_id
 
-# Process input file
 def processInput(file):
     '''
-        Processes the input file based on file type
+        Processes and extracts data from an uploaded PDF file.
+
+        Parameters:
+        file: The uploaded file object.
+
+        Returns:
+        tuple: Extracted text, tables, and folder ID containing images. 
+        Returns an empty list if the file is None or not a PDF.
     '''
     if file is None:
         st.error("Could not upload files! Try again!")

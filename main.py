@@ -31,7 +31,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 # Configure pinecone index
-INDEX_NAME = "test"
+INDEX_NAME = "main"
 if INDEX_NAME not in pc.list_indexes().names():
     pc.create_index(
         name=INDEX_NAME,
