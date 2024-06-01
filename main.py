@@ -31,7 +31,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 # Configure pinecone index
-INDEX_NAME = "main"
+INDEX_NAME = "test"
 if INDEX_NAME not in pc.list_indexes().names():
     pc.create_index(
         name=INDEX_NAME,
@@ -103,7 +103,7 @@ based on the provided CONTEXT, Your task is to give detailed answers to queries 
 based on the CONTEXT provided. The CONTEXT can include text, table summaries\
 or image summaries.Do not comment on the image."
 
-def add_to_vectorstore(texts, text_sum, tables, tables_sum, image_paths, images_sum):
+def add_to_vectorstore(texts, text_sum, tables, tables_sum, image_paths, images_sum, car_name="Unknown"):
     '''
         Processes texts, tables, and images along with their summaries,
         converts these summaries into vector embeddings, and then upserts them
@@ -125,17 +125,17 @@ def add_to_vectorstore(texts, text_sum, tables, tables_sum, image_paths, images_
     # Embed and store text summaries
     for text, summary in zip(texts, text_sum):
         summary_vector = embeddings.embed_documents([summary])[0]
-        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'text_summary', 'content': summary, 'raw_text': text}))
+        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'text_summary', 'content': summary, 'raw_text': text, 'car_name': car_name}))
 
     # Embed and store table summaries
     for table, summary in zip(tables, tables_sum):
         summary_vector = embeddings.embed_documents([summary])[0]
-        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'table_summary', 'content': summary, 'raw_table': table}))
+        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'table_summary', 'content': summary, 'raw_table': table, 'car_name': car_name}))
 
     # Embed and store image summaries and image embeddings
     for image_path, summary in zip(image_paths, images_sum):
         summary_vector = embeddings.embed_documents([summary])[0]
-        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'image_summary', 'content': summary, 'filepath': image_path}))
+        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'image_summary', 'content': summary, 'filepath': image_path, 'car_name': car_name}))
 
     # Upsert to pinecone in batches
     max_batch_size = 100
@@ -330,7 +330,8 @@ def main():
                             status.update(label="Successfully extracted data!", state="running", expanded=True)
                             st.write(f'Extracted {len(texts)} text chunks and {len(tables)} tables')
                             st.write(f"Extracted data in : {time.time()-start_time:.2f} s")
-
+                            car_name = get_car_name(model, texts)
+                            
                             # Generate summaries of data
                             st.write("Summarizing data...")
                             text_summ, table_summ = generate_summaries(model, texts, tables)
@@ -341,10 +342,10 @@ def main():
 
                             # Convert to embeddings and store in pinecone
                             st.write("Converting text to embeddings...")
-                            add_to_vectorstore(texts, text_summ, tables, table_summ, image_paths, image_summ)
+                            add_to_vectorstore(texts, text_summ, tables, table_summ, image_paths, image_summ, car_name=car_name)
                             status.update(label="Successfully stored embeddings", state="running", expanded=True)
                             st.write(f"Updated vector store in : {time.time()-start_time:.2f} s")
-
+                            
                             st.session_state.processed_files.append(new_file.name)
                         status.update(label="Processing Complete!", state="complete", expanded=False)
                 else:

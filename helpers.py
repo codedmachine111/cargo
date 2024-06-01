@@ -144,3 +144,20 @@ def summarize_image(model, image_path):
             summary += "Sorry could not analyse the image. Try again"
     os.remove(image_path)
     return summary
+
+def get_car_name(model, texts):
+    content=""
+    for text in texts:
+        content += text
+
+    prompt = f"""
+        You are an automotive assistant tasked with naming ONLY THE NAME OF THE CAR, \
+        based on the CONTEXT provided \n: CONTEXT: {content}"""
+    
+    response = model.generate_content(prompt)
+
+    if response and hasattr(response, 'text'):
+        response = response.text.upper()
+    else:
+        response = "Unknown"
+    return response

@@ -28,7 +28,7 @@ def extract_all_data(pdf_path):
     raw_elements = partition_pdf(
         filename=pdf_path,
         chunking_strategy="by_title",
-        extract_images_in_pdf=True,
+        extract_images_in_pdf=False,
         infer_table_structure=True,
         max_characters=1000,
         new_after_n_chars=1500,
