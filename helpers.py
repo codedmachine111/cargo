@@ -4,7 +4,7 @@ import PIL
 import PIL.Image
 from utils import *
 import shutil
-
+import streamlit as st
 # Threshold to avoid smaller images
 MIN_IMAGE_HEIGHT = 50
 MIN_IMAGE_WIDTH = 50
@@ -55,11 +55,19 @@ def generate_summaries(model, texts, tables, summarize_texts=False):
         for table in tables:
             prompt = summarize_prompt(table)
             response = model.generate_content(prompt)
-            if response and hasattr(response, 'text'):
-                table_summaries.append(response.text)
-            else:
-                table_summaries.append("Summary not available")
 
+            if response and response.candidates:
+                candidate = response.candidates[0]
+                if len(candidate.content.parts)>0:
+                    res = candidate.content.parts[0].text
+                    if res:
+                        table_summaries.append(res)
+                    else:
+                        table_summaries.append(str(table))
+                else:
+                        table_summaries.append(str(table))
+            else:
+                table_summaries.append(str(table))
     return text_summaries, table_summaries
 
 def generate_image_summaries(model, folder_id):
@@ -96,11 +104,14 @@ def generate_image_summaries(model, folder_id):
                     continue
                 
                 response = model.generate_content([prompt, img])
-                if response and hasattr(response, 'text'):
-                    image_summaries.append(response.text)
-                    # upload image to cloudinary and get url
-                    url = upload_image(image_path)
-                    image_filepaths.append(url)
+                if response and response.candidates:
+                    candidate = response.candidates[0]
+                    if len(candidate.content.parts)>0:
+                        res = candidate.content.parts[0].text
+                        image_summaries.append(res)
+                        # upload image to cloudinary and get url
+                        url = upload_image(image_path)
+                        image_filepaths.append(url)
     shutil.rmtree(image_dir)
     return image_summaries, image_filepaths
 
@@ -144,3 +155,33 @@ def summarize_image(model, image_path):
             summary += "Sorry could not analyse the image. Try again"
     os.remove(image_path)
     return summary
+
+def get_car_name(model, texts):
+    '''
+        Extracts and returns the name of a car from the provided textual context using a given model.
+
+        Parameters:
+        model: The model used to generate the car name.
+        texts (list of str): List of text snippets containing the context from which to extract the car name.
+
+        Returns:
+        str: The name of the car in uppercase if successfully extracted, otherwise "Unknown".
+    '''
+    content=""
+    for text in texts:
+        content += text
+
+    prompt = f"""
+        You are an automotive assistant tasked with naming ONLY THE NAME OF THE CAR, \
+        based on the CONTEXT provided. If you cannot find a car name, respond with UNKNOWN. \n: CONTEXT: {content}"""
+    
+    try:
+        response = model.generate_content(prompt)
+
+        if response and hasattr(response, 'text'):
+            response = response.text.upper()
+    except:
+        st.toast("Error getting Car name.")
+        response = "UNKNOWN"
+        return response
+    return response

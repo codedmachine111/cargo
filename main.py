@@ -88,10 +88,9 @@ chat_model = ChatModel.from_pretrained("chat-bison@002")
 system_context = "You are an automotive assistant at an automobile company.\
 Your task is to give detailed answers to queries in a few sentences \
 based on the CONTEXT provided. The CONTEXT can include text, table summaries\
-or image summaries. If the QUESTION is not related to automobiles or the context, you MUST \
-respond with: SORRY I COULD NOT FIND ANYTHING RELEVANT. If QUESTION is a greeting,\
-reply with HOW MAY I HELP YOU. If the QUESTION is very vague or a keyword, you MUST ask a follow-up question to get more clarity. \
-If you dont know about the car name, you MUST ask for it"
+or image summaries. If the QUESTION is not related to automobiles or you cannot find an answer in the CONTEXT, you MUST \
+respond with: SORRY I COULD NOT FIND ANYTHING RELEVANT. If it is the FIRST QUERY without a car name or If you dont know the name of the car, you MUST ask for it and remember the car name.\
+If the QUESTION is very vague or just a keyword, you MUST ask a follow-up question to get more clarity. If the QUERY is asking you to show an image, you need to summarize the available CONTEXT related to the query"
 
 system_image_context = "You are an automotive assistant at an automobile company.\
 You are given with a summary of an image, summarized using an LLM. You are also given\
@@ -103,7 +102,7 @@ based on the provided CONTEXT, Your task is to give detailed answers to queries 
 based on the CONTEXT provided. The CONTEXT can include text, table summaries\
 or image summaries.Do not comment on the image."
 
-def add_to_vectorstore(texts, text_sum, tables, tables_sum, image_paths, images_sum):
+def add_to_vectorstore(texts, text_sum, tables, tables_sum, image_paths, images_sum, car_name="UNKNOWN"):
     '''
         Processes texts, tables, and images along with their summaries,
         converts these summaries into vector embeddings, and then upserts them
@@ -125,17 +124,17 @@ def add_to_vectorstore(texts, text_sum, tables, tables_sum, image_paths, images_
     # Embed and store text summaries
     for text, summary in zip(texts, text_sum):
         summary_vector = embeddings.embed_documents([summary])[0]
-        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'text_summary', 'content': summary, 'raw_text': text}))
+        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'text_summary', 'content': summary, 'raw_text': text, 'car_name': car_name}))
 
     # Embed and store table summaries
     for table, summary in zip(tables, tables_sum):
         summary_vector = embeddings.embed_documents([summary])[0]
-        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'table_summary', 'content': summary, 'raw_table': table}))
+        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'table_summary', 'content': summary, 'raw_table': table, 'car_name': car_name}))
 
     # Embed and store image summaries and image embeddings
     for image_path, summary in zip(image_paths, images_sum):
         summary_vector = embeddings.embed_documents([summary])[0]
-        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'image_summary', 'content': summary, 'filepath': image_path}))
+        vectors.append((str(uuid.uuid4()), summary_vector, {'type': 'image_summary', 'content': summary, 'filepath': image_path, 'car_name': car_name}))
 
     # Upsert to pinecone in batches
     max_batch_size = 100
@@ -262,17 +261,18 @@ async def handle_text_query(question):
     files_to_display = []
     for doc in docs:
         metadata = doc.metadata
+        car_info = f"\nThe below info is related to car {metadata['car_name']}: \n"
         if 'raw_text' in metadata:
-            text_data.append(metadata['raw_text'])
+            text_data.append(car_info+metadata['raw_text'])
         elif 'raw_table' in metadata:
-            table_data.append(metadata['raw_table'])
+            table_data.append(car_info+metadata['raw_table'])
         elif 'filepath' in metadata:
             files_to_display.append(metadata['filepath'])
-            image_summaries.append(metadata['content'])
+            image_summaries.append(car_info+metadata['content'])
 
-    context = "CONTEXT : \n Text:\n" + "\n".join(text_data) + "\n\n" + \
-              "Tables:\n" + "\n".join(table_data) + "\n\n" + \
-              "Image summaries:\n" + "\n".join(image_summaries[:2])
+    context = "CONTEXT : \n TEXT:\n" + "\n".join(text_data) + "\n\n" + \
+              "TABLES:\n" + "\n".join(table_data) + "\n\n" + \
+              "IMAGE SUMMARIES:\n" + "\n".join(image_summaries[:2])
 
     images_html = "".join([f'<img src="{img}" id="res_img"/>' for img in files_to_display[:2]])
 
@@ -331,7 +331,9 @@ def main():
                             st.write(f'Extracted {len(texts)} text chunks and {len(tables)} tables')
                             st.write(f"Extracted data in : {time.time()-start_time:.2f} s")
 
+                            
                             # Generate summaries of data
+                            car_name = get_car_name(model, texts[:5])
                             st.write("Summarizing data...")
                             text_summ, table_summ = generate_summaries(model, texts, tables)
                             image_summ, image_paths = generate_image_summaries(model, folder_id)
@@ -341,7 +343,7 @@ def main():
 
                             # Convert to embeddings and store in pinecone
                             st.write("Converting text to embeddings...")
-                            add_to_vectorstore(texts, text_summ, tables, table_summ, image_paths, image_summ)
+                            add_to_vectorstore(texts, text_summ, tables, table_summ, image_paths, image_summ, car_name=car_name)
                             status.update(label="Successfully stored embeddings", state="running", expanded=True)
                             st.write(f"Updated vector store in : {time.time()-start_time:.2f} s")
 
