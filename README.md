@@ -38,7 +38,7 @@ Cargo is an RAG designed to allow users to chat with multiple large PDF document
 - **Streamlit**: allows for the rapid development of interactive web applications with minimal coding effort.
 
 ## Architecture
-<img src="https://github.com/codedmachine111/cargo/assets/88738817/fe8bb9ee-6571-46f7-bf02-4b066abdd6c4" width="900px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="https://github.com/codedmachine111/cargo/assets/88738817/418acd24-d7cb-4e07-bdd2-c739a8559ee7" width="900px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 
 ## Installation steps
 
