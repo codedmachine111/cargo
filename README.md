@@ -1,5 +1,6 @@
-> **Note**
-> This project is a part of BGSW (Bosch) GenAI Hackathon.
+> **Note:**
+> This project is a part of BGSW (Bosch) GenAI Hackathon.  
+> [Pitch Deck](https://www.canva.com/design/DAGG08_sI54/P6Aunmfw38Nw9r0wMHHSaw/view?utm_content=DAGG08_sI54&utm_campaign=designshare&utm_medium=link&utm_source=editor)
 <p align="center">
 
   <img src="https://github.com/codedmachine111/cargo/assets/88738817/3672b024-1f5e-45fa-b179-9aa03e4087dd" alt="cargo-banner" width="700">
