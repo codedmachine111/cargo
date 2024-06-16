@@ -9,14 +9,14 @@
 
 # Cargo
 
-Cargo is an RAG designed to allow users to chat with multiple large PDF documents with ease. This robust platform enables users to interact seamlessly with their PDF files that include images, text, and tables, through an AI-driven chatbot named "Captain."
+Cargo is an AI-powered advanced multimodal RAG chatbot designed to enable automotive companies to interact effectively with their extensive user manuals. This robust platform enables users to interact seamlessly with their PDF files that includes images, text, and tables.
 
 ## Features
 
 - Q&A with multiple PDFs.
 - Analyses texts, tables and images in given documents.
 - LLM integration for intelligent responses.
-- Efficient search and data retrieval.
+- Multimodal search and retrieval.
 - Search using images.
 
 ## Tools used
